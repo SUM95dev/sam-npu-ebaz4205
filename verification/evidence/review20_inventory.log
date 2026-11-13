@@ -1,0 +1,51 @@
+RESULT 50 /50
+01 PASS - RTL files present :: 29
+02 PASS - Simulation files present :: 52
+03 PASS - No duplicate RTL module names :: []
+04 PASS - Module exists: npu_axis_system_top :: 
+05 PASS - Module exists: npu_v4_top :: 
+06 PASS - Module exists: matmul_engine :: 
+07 PASS - Module exists: conv_stream_job_engine :: 
+08 PASS - Module exists: conv2d_gemm_feeder :: 
+09 PASS - Module exists: shared_postprocess :: 
+10 PASS - No merge conflict markers :: 
+11 PASS - Balanced parentheses :: []
+12 PASS - Balanced brackets :: []
+13 PASS - Balanced braces :: []
+14 PASS - Balanced begin/end :: []
+15 PASS - Balanced module/endmodule :: []
+16 PASS - Named-port audit zero issues :: modules 29 instances 55 issues 0
+17 PASS - All Python files compile :: []
+18 PASS - Numerical golden model :: PASS numerical golden tests
+19 PASS - Systolic cycle audit :: PASS: 1000 random matrix shapes, all tiles, random stalls
+20 PASS - Self-test vector generation :: /tmp/npu_selftest.json
+21 PASS - SNPU model packer :: /tmp/npu_model.snpu
+22 PASS - SNPU model magic :: 
+23 PASS - MatMul packer randomized framing :: 200 cases
+24 PASS - Conv packer output shape :: (2, 2, 1)
+25 PASS - INT32 accumulator max-K bound :: 1073725440
+26 PASS - Feed-step width covers K+N-2 :: 
+27 PASS - N=1 flush formula :: 
+28 PASS - N=8 flush formula :: 
+29 PASS - MatMul controller has output_ready :: 
+30 PASS - MatMul engine propagates output_ready :: 
+31 PASS - Tile serializer snapshots payload :: 
+32 PASS - Tile serializer job-level TLAST :: 
+33 PASS - AXI read uses pending stage :: 
+34 PASS - AXI WSTRB propagated :: 
+35 PASS - Conv geometry divide-by-zero guard :: 
+36 PASS - Conv geometry underflow guard :: 
+37 PASS - Conv stream separates sample-last/job-last :: 
+38 PASS - Conv stream has output backpressure :: 
+39 PASS - Conv GEMM feeder data-valid alignment :: 
+40 PASS - Conv systolic reuses matmul engine :: 
+41 PASS - Conv systolic size guard :: 
+42 PASS - Legacy broken frontend removed from RTL :: 
+43 PASS - Linux UIO userspace C syntax :: 
+44 PASS - Linux DMA test C syntax :: 
+45 PASS - Vivado script testbench names exist :: []
+46 PASS - Vivado synthesis top exists :: 
+47 PASS - Vivado part is XC7Z010 CLG400 :: 
+48 PASS - Board DDR config not fabricated :: 
+49 PASS - Hardware verification limitation documented :: 
+50 PASS - Final ZIP CRC integrity :: None

@@ -1,0 +1,2 @@
+PASS exhaustive Add: 131072 signed pairs including ReLU and stalls
+/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/tb_add_exhaustive.v:23: $finish called at 3058420000 (1ps)

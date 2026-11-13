@@ -1,0 +1,2 @@
+FAIL Conv accepted data beyond final sample
+verification/extra/tb_conv_final_fence.v:15: $finish called at 120000 (1ps)

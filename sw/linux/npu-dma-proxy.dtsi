@@ -1,0 +1,7 @@
+/ {
+    npu_dma_proxy {
+        compatible = "sam,npu-dma-proxy";
+        dmas = <&axi_dma_0 0>, <&axi_dma_0 1>;
+        dma-names = "tx", "rx";
+    };
+};

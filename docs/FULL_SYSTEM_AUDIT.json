@@ -1,0 +1,23 @@
+{
+  "source_base": "Sam_NPU_CURRENT",
+  "added_features": [
+    "AXI4-Lite slave wrapper",
+    "AXI-Stream MatMul feeder",
+    "AXI-Stream output",
+    "Conv AXIS adapter",
+    "Conv2D hardware scheduler",
+    "Conv2D address generator",
+    "Conv memory-side top",
+    "Vitis AXI DMA runtime example",
+    "stream packers",
+    "Vivado PS7+DMA BD skeleton"
+  ],
+  "python_pack_test": "PASS pack_matmul randomized",
+  "static_delimiter_issues": [],
+  "important_limitations": [
+    "No HDL compiler/simulator available in generation environment",
+    "Exact EBAZ4205 PS7 DDR/MIO configuration not fabricated",
+    "Vivado synthesis/timing/board validation still required",
+    "Streaming Conv path uses software-packed windows; hardware Conv path exposes memory request/response ports"
+  ]
+}

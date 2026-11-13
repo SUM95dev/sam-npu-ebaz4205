@@ -1,0 +1,10 @@
+{
+  "added": [
+    "rtl/npu_bd_top.v",
+    "scripts/create_ebaz4205_full_bd.tcl",
+    "scripts/build_ebaz4205_system.tcl",
+    "docs/EBAZ4205_BOARD_BRINGUP.md"
+  ],
+  "static_issues": [],
+  "verification_boundary": "Vivado IP Integrator commands must be executed in Vivado 2020.2 on the user system; no Vivado binary exists in this environment."
+}

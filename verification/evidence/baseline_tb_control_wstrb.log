@@ -1,0 +1,2 @@
+FAIL zero WSTRB changed CONTROL
+/tmp/snpu_hdl/tb_control_wstrb.v:36: $finish called at 290000 (1ps)

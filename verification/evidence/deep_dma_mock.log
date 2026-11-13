@@ -1,0 +1,5 @@
+PASS concurrent WAIT serialization
+PASS timeout recovery and failed-cancel pending retention
+PASS independent TX/RX operation
+PASS remove retains allocations until final file release, removed ioctl rejected
+PASS failed close cancellation quarantines allocations and rejects reuse

@@ -1,0 +1,100 @@
+{
+  "name": "Sam NPU — REVIEW50 host-network candidate",
+  "target": "EBAZ4205 / Zynq-7010 / xc7z010clg400-1",
+  "vivado": "2020.2",
+  "hardware_api": "2.0",
+  "default_array": "8x8",
+  "precision": "INT8 x INT8 -> INT32 accumulation -> requant -> INT8",
+  "execution_modes": [
+    "MatMul/Dense",
+    "Streaming Conv2D",
+    "Grouped/Depthwise Conv2D via stream packing",
+    "MaxPool2x2",
+    "Elementwise INT8 Add/Residual"
+  ],
+  "control_path": "PS7 M_AXI_GP0 -> AXI-Lite -> NPU, base 0x43C00000 / 64 KiB",
+  "data_path": "DDR3 <-> PS7 S_AXI_HP0 <-> AXI DMA <-> AXI-Stream <-> NPU",
+  "network_path": "GEM0 over EMIO/MII -> EBAZ4205 onboard Ethernet PHY -> Linux TCP server",
+  "network_ops": [
+    "INFO",
+    "MatMul",
+    "Conv",
+    "MaxPool2x2",
+    "Add"
+  ],
+  "integrated_features": [
+    "per-output INT32 Conv bias",
+    "streamed INT32 MatMul/Dense column bias",
+    "sticky completion IRQ",
+    "hardware abort",
+    "version/capability registers",
+    "performance counters",
+    "TCP telemetry/info",
+    "board end-to-end selftest"
+  ],
+  "rtl_file_count": 29,
+  "rtl_line_count": 2385,
+  "testbench_count": 55,
+  "testbench_line_count": 5074,
+  "verification_script": "scripts/run_vivado_verification.tcl (55 cases; finite 200us per case)",
+  "source_validation": [
+    "scripts/fifty_pass_audit.py (50/50 PASS)",
+    "scripts/five_pass_source_audit.py (25/25 PASS)",
+    "scripts/final_release_audit.py (36/36 PASS)",
+    "scripts/five_more_pass_audit.py (30/30 PASS)",
+    "scripts/third_five_pass_audit.py (30/30 PASS)",
+    "Kernel module compiled with W=1 against Linux 6.8.0-31 x86-64 headers; actual ARM/PetaLinux build and runtime are unverified"
+  ],
+  "canonical_release_notes": "REVIEW50.md",
+  "status": "50/50 directed host checks and 55/55 Icarus RTL regressions PASS. Hardware acceptance remains open.",
+  "known_user_baseline": {
+    "old_xsim_summary": "PASS=20 FAIL=0 from pre-hardened summary logic",
+    "old_synthesis": {
+      "luts": 3639,
+      "ffs": 1915,
+      "dsps": 72,
+      "dsp_total": 80
+    }
+  },
+  "important_limits": [
+    "No Vivado/XSim execution here. Icarus functional simulation passed; routed timing and board operation are unverified.",
+    "Exact external MII I/O delays require PHY/board timing validation",
+    "Optional U18 PHY clock must only be enabled on board variants that require PL-supplied 25 MHz",
+    "MatMul/Dense supports per-output-column INT32 bias via stream preamble; arbitrary per-element MxN bias is not exposed",
+    "Real Ethernet link, DMA traffic and inference must be verified on the physical EBAZ4205",
+    "Network MatMul replies are conventional row-major; hardware DMA output is compact tile-major and is reordered by the server",
+    "Streaming Conv is rejected if a single output exceeds the safe INT32 worst-case MAC accumulation bound (131071 samples)",
+    "Low-RAM defaults: VIVADO_JOBS=1 and XSIM_MT_LEVEL=off; increase only on a machine with more memory",
+    "No-Y3 PHY clock profile requires R1485 bridged from FPGA U18 to IP101GA pin 47; physical link must be confirmed on the actual PCB.",
+    "Production Conv2D uses host/ARM spatial-window lowering plus PL streaming INT8 MAC; legacy memory-address Conv2D scheduler modules are not reachable from npu_bd_top.",
+    "The SNPU v2 package is a validated intermediate weight/layer format; this release does not provide a complete on-board graph runtime that executes arbitrary .snpu files end-to-end."
+  ],
+  "source_line_count_rtl_sim_sw_scripts": 6899,
+  "host_tools": [
+    "NpuSession.conv_nhwc",
+    "npu_benchmark.py",
+    "npu_board_selftest.py",
+    "npu_net_client.py",
+    "npu_net_client.py conv",
+    "snpu_inspect.py"
+  ],
+  "compiler_safety": "Strict INT8/INT32 range and shape/count validation; ONNX converter refuses silent floating-point-to-INT8 casts",
+  "software_line_count": 2114,
+  "production_rtl_reachable_modules": 17,
+  "legacy_research_unreachable_rtl_modules": 12,
+  "dma_length_width": 23,
+  "extra_validation": [
+    "29-module Verilator lint sweep (warnings retained)",
+    "8 ONNX integration tests",
+    "pthread-backed DMA function tests with ASan/UBSan",
+    "11 C socketpair requests and Conv accumulation-length boundaries",
+    "Tcl API mocks for DMA/reset/IRQ properties",
+    "50 directed request/session/SNPU/packer/shutdown checks"
+  ],
+  "review50_checks": 50,
+  "ethernet_clock_profiles": {
+    "default": "Onboard Y3/25 MHz oscillator assumed; U18 is not driven.",
+    "no_y3": "Use scripts/build_ebaz4205_no_y3.sh after confirming R1485 is bridged; PS FCLK1=25 MHz is routed to U18/IP101GA pin 47.",
+    "hardware_gate": "R1485 physical bridge and no-Y3 condition are not software-verifiable; confirm on the actual PCB before enabling the profile."
+  }
+}

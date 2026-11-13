@@ -1,0 +1,21 @@
+{
+  "review_passes_total": 15,
+  "new_passes": [11, 12, 13, 14, 15],
+  "bugs_fixed_this_batch": [
+    "registered flush_en caused one missing systolic drain beat",
+    "one-clock configuration-write race after START acceptance"
+  ],
+  "new_testbenches": [
+    "tb_controller_flush_cycles.v",
+    "tb_regs_start_lock.v"
+  ],
+  "cycle_model": {
+    "random_matrix_shapes": 1000,
+    "array_sizes": [1, 2, 4, 8],
+    "random_stalls": true,
+    "failures": 0
+  },
+  "lexical_balance_issues": 0,
+  "hdl_simulation_executed": false,
+  "vivado_synthesis_executed": false
+}

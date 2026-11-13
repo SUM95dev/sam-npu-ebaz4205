@@ -1,0 +1,240 @@
+--- deep/sw/host/npu_net_client.py
++++ review50/sw/host/npu_net_client.py
+@@ -82,8 +82,13 @@
+         self.host=host; self.port=port; self.timeout=timeout; self.sock=None; self._next_id=1
+     def connect(self):
+         if self.sock is None:
+-            self.sock=socket.create_connection((self.host,self.port),timeout=self.timeout)
+-            self.sock.settimeout(self.timeout)
++            sock=socket.create_connection((self.host,self.port),timeout=self.timeout)
++            try:
++                sock.settimeout(self.timeout)
++            except Exception:
++                sock.close()
++                raise
++            self.sock=sock
+         return self
+     def close(self):
+         if self.sock is not None:
+@@ -96,12 +101,12 @@
+         if not (0 <= qshift <= 63): raise ValueError("qshift must be 0..63")
+         as_i8(zp,"zero_point")
+         as_i32(qmul,"qmul")
+-        self.connect()
+         if request_id is None:
+             request_id=self._next_id; self._next_id=(self._next_id+1)&0xffffffff or 1
+-        flags=(FLAG_RELU if relu else 0) | int(extra_flags)
++        flags=(FLAG_RELU if relu else 0) | integer(extra_flags)
+         hdr=REQ.pack(MAGIC,VERSION,opcode,M,N,K,flags,int(qmul),int(qshift),int(zp),0,len(payload),out_bytes,request_id)
+         try:
++            self.connect()
+             self.sock.sendall(hdr)
+             if payload: self.sock.sendall(payload)
+             rep=recv_exact(self.sock,REP.size)
+@@ -117,8 +122,11 @@
+             raise
+ 
+ def request(host,port=9505,opcode=OP_INFO,M=0,N=0,K=0,payload=b'',out_bytes=0,relu=False,qmul=1,qshift=0,zp=0,request_id=1,extra_flags=0):
+-    with NpuSession(host,port) as s:
++    s=NpuSession(host,port)
++    try:
+         return s.request(opcode,M,N,K,payload,out_bytes,relu,qmul,qshift,zp,request_id,extra_flags)
++    finally:
++        s.close()
+ 
+ def decode_i8_words(result):
+     if len(result)%4: raise ValueError("result length is not 32-bit-word aligned")
+--- deep/sw/linux/npu_net_server.c
++++ review50/sw/linux/npu_net_server.c
+@@ -99,30 +99,42 @@
+ static volatile uint32_t *regs;
+ 
+ static void on_signal(int sig) { (void)sig; keep_running = 0; }
++/* Do not restart accept/recv automatically: SIGTERM must stop an idle service. */
++static int install_signal_handlers(void)
++{
++    struct sigaction sa;
++    memset(&sa, 0, sizeof(sa));
++    sigemptyset(&sa.sa_mask);
++    sa.sa_handler = on_signal;
++    if (sigaction(SIGINT, &sa, NULL) || sigaction(SIGTERM, &sa, NULL)) return -1;
++    sa.sa_handler = SIG_IGN;
++    return sigaction(SIGPIPE, &sa, NULL);
++}
+ static inline void wr(unsigned off, uint32_t v) { regs[off >> 2] = v; }
+ static inline uint32_t rd(unsigned off) { return regs[off >> 2]; }
+ 
+ static int recv_all(int fd, void *buf, size_t len)
+ {
+     uint8_t *p = buf;
+-    while (len) {
++    while (len && keep_running) {
+         ssize_t n = recv(fd, p, len, 0);
+         if (n == 0) return -1;
+-        if (n < 0) { if (errno == EINTR) continue; return -1; }
++        if (n < 0) { if (errno == EINTR && keep_running) continue; return -1; }
+         p += (size_t)n; len -= (size_t)n;
+     }
+-    return 0;
++    return len ? -1 : 0;
+ }
+ 
+ static int send_all(int fd, const void *buf, size_t len)
+ {
+     const uint8_t *p = buf;
+-    while (len) {
++    while (len && keep_running) {
+         ssize_t n = send(fd, p, len, MSG_NOSIGNAL);
+-        if (n < 0) { if (errno == EINTR) continue; return -1; }
++        if (n == 0) return -1;
++        if (n < 0) { if (errno == EINTR && keep_running) continue; return -1; }
+         p += (size_t)n; len -= (size_t)n;
+     }
+-    return 0;
++    return len ? -1 : 0;
+ }
+ 
+ static int npu_wait_done_ms(unsigned timeout_ms)
+@@ -334,7 +346,7 @@
+     const char *uio_dev = argc > 2 ? argv[2] : "/dev/uio0";
+     const char *dma_dev = argc > 3 ? argv[3] : "/dev/npu_dma";
+ 
+-    signal(SIGINT, on_signal); signal(SIGTERM, on_signal); signal(SIGPIPE, SIG_IGN);
++    if (install_signal_handlers() < 0) { perror("sigaction"); return 1; }
+ 
+     int uio_fd = open(uio_dev, O_RDWR | O_SYNC);
+     if (uio_fd < 0) { perror("open uio"); return 1; }
+--- deep/scripts/validate_release.sh
++++ review50/scripts/validate_release.sh
+@@ -75,4 +75,6 @@
+ python3 verification/review20/test_software.py -v
+ python3 verification/review20/test_baremetal.py
+ 
++python3 verification/review50/run_50_checks.py
++
+ echo "FINAL RELEASE STATIC VALIDATION PASS"
+--- deep/verification/review50/check_shutdown.c.in
++++ review50/verification/review50/check_shutdown.c.in
+@@ -0,0 +1,20 @@
++#define main server_program_main
++#include "SOURCE"
++#undef main
++#include <assert.h>
++#include <sys/wait.h>
++static int setup_signals(void){SETUP_SIGNALS}
++int main(int argc,char **argv){
++ assert(argc==2);int mode=atoi(argv[1]),syncfd[2],pair[2],listener=-1;assert(!pipe(syncfd));
++ if(mode==0){listener=socket(AF_INET,SOCK_STREAM,0);assert(listener>=0);struct sockaddr_in a={0};a.sin_family=AF_INET;a.sin_addr.s_addr=htonl(INADDR_LOOPBACK);assert(!bind(listener,(void*)&a,sizeof(a)));assert(!listen(listener,1));}
++ else assert(!socketpair(AF_UNIX,SOCK_STREAM,0,pair));
++ pid_t pid=fork();assert(pid>=0);
++ if(pid==0){close(syncfd[0]);if(mode)close(pair[0]);keep_running=1;assert(!setup_signals());assert(write(syncfd[1],"!",1)==1);close(syncfd[1]);
++  int rc;if(mode==0)rc=accept(listener,0,0);else{char b;rc=recv_all(pair[1],&b,1);}
++  _exit(rc<0&&!keep_running?0:2);
++ }
++ close(syncfd[1]);if(mode)close(pair[1]);char c;assert(read(syncfd[0],&c,1)==1);close(syncfd[0]);usleep(20000);kill(pid,SIGTERM);
++ int status=0,done=0;for(int i=0;i<100;i++){if(waitpid(pid,&status,WNOHANG)==pid){done=1;break;}usleep(10000);}
++ if(!done){kill(pid,SIGKILL);waitpid(pid,&status,0);fprintf(stderr,"FAIL SIGTERM left %s blocked\n",mode?"recv_all":"accept");return 1;}
++ assert(WIFEXITED(status)&&WEXITSTATUS(status)==0);if(mode)close(pair[0]);else close(listener);puts("PASS prompt SIGTERM shutdown");return 0;
++}
+--- deep/verification/review50/run_50_checks.py
++++ review50/verification/review50/run_50_checks.py
+@@ -0,0 +1,99 @@
++#!/usr/bin/env python3
++"""50 directed checks of current host code. Not 50 whole-project reviews.
++Optional --source points at a previous tree to reproduce pre-fix failures.
++"""
++import argparse,importlib.util,json,pathlib,struct,subprocess,tempfile,unittest
++from unittest.mock import patch
++p=argparse.ArgumentParser();p.add_argument('--source');p.add_argument('--report');args=p.parse_args()
++root=pathlib.Path(args.source).resolve() if args.source else pathlib.Path(__file__).resolve().parents[2]
++here=pathlib.Path(__file__).resolve().parent
++
++def load(name,path):
++ s=importlib.util.spec_from_file_location(name,root/path);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
++net=load('net50','sw/host/npu_net_client.py');inspect=load('inspect50','sw/snpu_inspect.py');mm=load('mm50','sw/pack_matmul_stream.py');cv=load('cv50','sw/pack_conv_stream.py')
++class Sock:
++ def __init__(self,blob=b'',timeout_error=False):self.blob=blob;self.closed=False;self.sent=[];self.timeout_error=timeout_error
++ def recv(self,n):b=self.blob[:min(n,3)];self.blob=self.blob[len(b):];return b
++ def sendall(self,b):self.sent.append(b)
++ def close(self):self.closed=True
++ def settimeout(self,t):
++  if self.timeout_error:raise OSError('injected settimeout failure')
++def reply(rid=1,n=4,body=b'abcd',magic=b'SNPR',status=0):return net.REP.pack(magic,rid,status,n)+body
++class Checks(unittest.TestCase):
++ @classmethod
++ def setUpClass(cls):
++  cls.tmp=tempfile.TemporaryDirectory();td=pathlib.Path(cls.tmp.name);source=(root/'sw/linux/npu_net_server.c').read_text()
++  setup='return install_signal_handlers();' if 'static int install_signal_handlers(' in source else 'signal(SIGTERM,on_signal);return 0;'
++  c=(here/'check_shutdown.c.in').read_text().replace('SOURCE',str(root/'sw/linux/npu_net_server.c')).replace('SETUP_SIGNALS',setup)
++  (td/'test.c').write_text(c);cls.shutdown=str(td/'test')
++  subprocess.run(['gcc','-std=c11','-D_DEFAULT_SOURCE','-Wall','-Wextra','-Werror',str(td/'test.c'),'-o',cls.shutdown],check=True)
++ @classmethod
++ def tearDownClass(cls):cls.tmp.cleanup()
++ def reject_header(self,kw):
++  sock=Sock(reply());s=net.NpuSession('unused');calls=[]
++  def connect():calls.append(1);s.sock=sock;return s
++  s.connect=connect
++  with self.assertRaises((ValueError,TypeError,struct.error,OverflowError)):s.request(**kw)
++  self.assertEqual(calls,[], 'invalid local header opened a network session')
++ def test_19_timeout_setup_closes_socket(self):
++  sock=Sock(timeout_error=True);s=net.NpuSession('unused')
++  with patch.object(net.socket,'create_connection',return_value=sock):
++   with self.assertRaises(OSError):s.connect()
++  self.assertTrue(sock.closed);self.assertIsNone(s.sock)
++ def test_20_reconnect_after_bad_reply(self):
++  a=Sock(reply(magic=b'FAIL'));b=Sock(reply(rid=2));s=net.NpuSession('unused')
++  with patch.object(net.socket,'create_connection',side_effect=[a,b]):
++   with self.assertRaises(RuntimeError):s.request(net.OP_ADD,out_bytes=4)
++   self.assertTrue(a.closed);self.assertEqual(s.request(net.OP_ADD,out_bytes=4),b'abcd');s.close();self.assertTrue(b.closed)
++ def test_21_request_id_wrap(self):
++  sock=Sock(reply(rid=0xffffffff)+reply(rid=1));s=net.NpuSession('unused');s.sock=sock;s._next_id=0xffffffff
++  self.assertEqual(s.request(net.OP_ADD,out_bytes=4),b'abcd');self.assertEqual(s.request(net.OP_ADD,out_bytes=4),b'abcd');self.assertEqual(s._next_id,2)
++ def test_22_fragmented_body(self):
++  sock=Sock(reply(n=12,body=b'abcdefghijkl'));s=net.NpuSession('unused');s.sock=sock;self.assertEqual(s.request(net.OP_ADD,out_bytes=12),b'abcdefghijkl')
++ def test_23_wrapper_validates_before_connect(self):
++  with patch.object(net.socket,'create_connection',return_value=Sock(reply())) as connect:
++   with self.assertRaises((ValueError,TypeError,struct.error)):net.request('unused',opcode=-1)
++   connect.assert_not_called()
++ def test_24_wire_signed_extremes(self):
++  sock=Sock(reply());s=net.NpuSession('unused');s.sock=sock;s.request(net.OP_MATMUL,M=1,N=1,K=1,out_bytes=4,qmul=-(1<<31),qshift=63,zp=-128,relu=True,extra_flags=2)
++  header=net.REQ.unpack(sock.sent[0]);self.assertEqual(header[6:10],(3,-(1<<31),63,-128))
++ def malformed(self,blob):
++  with tempfile.NamedTemporaryFile() as f:
++   f.write(blob);f.flush()
++   with self.assertRaises(ValueError):inspect.inspect(f.name)
++ def test_49_server_SIGTERM_idle_accept(self):subprocess.run([self.shutdown,'0'],check=True,timeout=3)
++ def test_50_server_SIGTERM_partial_request(self):subprocess.run([self.shutdown,'1'],check=True,timeout=3)
++invalid=[('opcode_negative',{'opcode':-1}),('opcode_overflow',{'opcode':65536}),('M_negative',{'opcode':1,'M':-1}),('N_overflow',{'opcode':1,'N':65536}),('K_overflow',{'opcode':1,'K':65536}),('out_bytes_negative',{'opcode':1,'out_bytes':-1}),('id_negative',{'opcode':1,'request_id':-1}),('id_overflow',{'opcode':1,'request_id':1<<32}),('flags_fractional',{'opcode':1,'extra_flags':1.9}),('shift_fractional',{'opcode':1,'qshift':1.9}),('multiplier_fractional',{'opcode':1,'qmul':1.9}),('zero_point_fractional',{'opcode':1,'zp':1.9})]
++for i,(name,kw) in enumerate(invalid,1):
++ def test(self,kw=kw):self.reject_header(kw)
++ setattr(Checks,f'test_{i:02d}_{name}',test)
++replies=[('bad_magic',reply(magic=b'WRNG')),('bad_id',reply(rid=7)),('server_error',reply(status=-11,n=0,body=b'')),('oversize_body',reply(n=0xffffffff,body=b'')),('header_truncated',b'SNPR'),('body_truncated',reply(body=b'a'))]
++for i,(name,blob) in enumerate(replies,13):
++ def test(self,blob=blob):
++  sock=Sock(blob);s=net.NpuSession('unused');s.sock=sock
++  with self.assertRaises((RuntimeError,ConnectionError)):s.request(net.OP_ADD,out_bytes=4)
++  self.assertTrue(sock.closed);self.assertIsNone(s.sock)
++ setattr(Checks,f'test_{i:02d}_{name}',test)
++head=b'SNPU'+struct.pack('<HH',2,1)
++def mat(M=1,N=1,K=1,nw=1,nb=1):return head+struct.pack('<BHHHI',1,M,N,K,nw)+bytes(nw)+struct.pack('<I',nb)+bytes(nb*4)
++def conv(H=1,W=1,C=1,O=1,G=1,Kh=1,Kw=1,S=1,P=0):
++ nw=O*Kh*Kw*(C//G) if G else 0
++ return head+struct.pack('<BHHHHHBBBBI',2,H,W,C,O,G,Kh,Kw,S,P,nw)+bytes(nw)+struct.pack('<I',O)+bytes(O*4)
++malformed=[('bad_magic',b'NOPE'+head[4:]),('version',b'SNPU'+struct.pack('<HH',99,0)),('empty_layers',b'SNPU'+struct.pack('<HH',2,0)),('unknown_op',head+b'\xff'),('truncated_header',b'SNPU\x02'),('M_zero',mat(M=0)),('N_zero',mat(N=0)),('K_zero',mat(K=0)),('weight_count',mat(nw=2)),('bias_count',mat(nb=2)),('conv_H_zero',conv(H=0)),('conv_W_zero',conv(W=0)),('conv_C_zero',conv(C=0)),('conv_O_zero',conv(O=0)),('conv_stride_zero',conv(S=0)),('conv_kernel_too_large',conv(Kh=2))]
++for i,(name,blob) in enumerate(malformed,25):
++ def test(self,blob=blob):self.malformed(blob)
++ setattr(Checks,f'test_{i:02d}_snpu_{name}',test)
++packers=[('ragged_A',lambda:mm.make_feed([[1],[2,3]],[[1]])),('ragged_B',lambda:mm.make_feed([[1]],[[1],[2]])),('empty_matrix',lambda:mm.make_feed([],[[1]])),('i8_overflow',lambda:mm.make_feed([[128]],[[1]])),('i8_underflow',lambda:mm.make_feed([[-129]],[[1]])),('bias_overflow',lambda:mm.make_feed([[1]],[[1]],bias=[1<<31])),('bias_count',lambda:mm.make_feed([[1]],[[1]],bias=[])),('conv_group_mismatch',lambda:cv.pack_conv_nhwc([[[1]]],[[[[1]]]],groups=2))]
++for i,(name,fn) in enumerate(packers,41):
++ def test(self,fn=fn):
++  with self.assertRaises((ValueError,TypeError)):fn()
++ setattr(Checks,f'test_{i:02d}_packer_{name}',test)
++class Result(unittest.TextTestResult):
++ def __init__(self,*a,**kw):super().__init__(*a,**kw);self.rows=[]
++ def addSuccess(self,t):super().addSuccess(t);self.rows.append({'check':t.id().split('.')[-1],'passed':True})
++ def addFailure(self,t,e):super().addFailure(t,e);self.rows.append({'check':t.id().split('.')[-1],'passed':False,'kind':'failure'})
++ def addError(self,t,e):super().addError(t,e);self.rows.append({'check':t.id().split('.')[-1],'passed':False,'kind':'error'})
++suite=unittest.defaultTestLoader.loadTestsFromTestCase(Checks);assert suite.countTestCases()==50
++r=unittest.TextTestRunner(verbosity=2,resultclass=Result).run(suite)
++if args.report:pathlib.Path(args.report).write_text(json.dumps({'source':str(root),'run':r.testsRun,'passed':sum(x['passed'] for x in r.rows),'checks':r.rows},indent=2))
++raise SystemExit(0 if r.wasSuccessful() else 1)

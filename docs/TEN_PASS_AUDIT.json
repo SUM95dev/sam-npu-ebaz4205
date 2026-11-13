@@ -1,0 +1,16 @@
+{
+  "rtl_modules": 12,
+  "structural_issues": [
+    "matmul_engine instance ctrl: unknown ports ['clear_acc', 'flush_en', 'output_valid', 'post_done', 'post_start']",
+    "maxpool2x2 instance pp_i: unknown ports ['acc_in', 'bias_in', 'multiplier', 'out', 'relu_en', 'shift', 'zero_point']",
+    "conv2d_stream_engine instance pp_i: unknown ports ['acc_in', 'bias_in', 'multiplier', 'out', 'shift']",
+    "systolic_array instance u_pe: unknown ports ['a_in', 'a_out', 'acc', 'b_in', 'b_out']",
+    "npu_v4_top instance mm_i: unknown ports ['K', 'M', 'Ndim', 'out_lane_valid', 'out_tile', 'out_tile_valid', 'qmul', 'qshift', 'relu_en', 'start', 'zero_point']",
+    "tile_postprocess instance pp_i: unknown ports ['acc_in', 'bias_in', 'multiplier', 'out', 'shift']"
+  ],
+  "cycle_model_failures": 0,
+  "cycle_model_cases": 560,
+  "max_abs_product": 16384,
+  "max_acc_bound": 1073725440,
+  "int32_safe": true
+}

@@ -1,0 +1,154 @@
+%Warning-PINCONNECTEMPTY: rtl/matmul_engine.v:63:30: Cell pin connected by name with empty reference: 'busy'
+   63 |         .out_tile(out_tile),.busy(),.done(post_done)
+      |                              ^~~~
+                          ... For warning description see https://verilator.org/warn/PINCONNECTEMPTY?v=5.020
+                          ... Use "/* verilator lint_off PINCONNECTEMPTY */" and lint_on around source to disable this message.
+%Warning-PINCONNECTEMPTY: rtl/npu_axis_system_top.v:169:38: Cell pin connected by name with empty reference: 's_axis_tready'
+  169 |         .s_axis_tlast(s_axis_tlast),.s_axis_tready(),
+      |                                      ^~~~~~~~~~~~~
+%Warning-PINMISSING: rtl/npu_v4_top.v:47:14: Cell has missing pin: 'mode_pool'
+   47 |     npu_regs regs_i(
+      |              ^~~~~~
+%Warning-PINMISSING: rtl/npu_v4_top.v:47:14: Cell has missing pin: 'mode_add'
+   47 |     npu_regs regs_i(
+      |              ^~~~~~
+%Warning-PINMISSING: rtl/npu_v4_top.v:47:14: Cell has missing pin: 'matmul_bias_en'
+   47 |     npu_regs regs_i(
+      |              ^~~~~~
+%Warning-PINMISSING: rtl/npu_v4_top.v:47:14: Cell has missing pin: 'abort_pulse'
+   47 |     npu_regs regs_i(
+      |              ^~~~~~
+%Warning-PINMISSING: rtl/npu_v4_top.v:47:14: Cell has missing pin: 'irq'
+   47 |     npu_regs regs_i(
+      |              ^~~~~~
+%Warning-PINCONNECTEMPTY: rtl/npu_v4_top.v:59:101: Cell pin connected by name with empty reference: 'out_job_last'
+   59 |         .out_tile(matmul_out),.out_lane_valid(matmul_lane_valid),.out_tile_valid(matmul_out_valid),.out_job_last(),.out_tile_ready(1'b1),.busy(mm_busy),.done(mm_done)
+      |                                                                                                     ^~~~~~~~~~~~
+%Warning-WIDTHTRUNC: rtl/npu_regs.v:172:22: Operator VAR 'ARRAY_N_U8' expects 8 bits on the Initial value, but Initial value's VARREF 'ARRAY_N' generates 32 bits.
+                                          : ... note: In instance 'npu_axis_system_top.regs'
+  172 |     localparam [7:0] ARRAY_N_U8 = ARRAY_N;
+      |                      ^~~~~~~~~~
+%Warning-WIDTHTRUNC: rtl/npu_regs.v:173:22: Operator VAR 'DATA_W_U8' expects 8 bits on the Initial value, but Initial value's VARREF 'DATA_W' generates 32 bits.
+                                          : ... note: In instance 'npu_axis_system_top.regs'
+  173 |     localparam [7:0] DATA_W_U8 = DATA_W;
+      |                      ^~~~~~~~~
+%Warning-WIDTHTRUNC: rtl/npu_regs.v:174:22: Operator VAR 'ACC_W_U8' expects 8 bits on the Initial value, but Initial value's VARREF 'ACC_W' generates 32 bits.
+                                          : ... note: In instance 'npu_axis_system_top.regs'
+  174 |     localparam [7:0] ACC_W_U8 = ACC_W;
+      |                      ^~~~~~~~
+%Warning-WIDTHEXPAND: rtl/npu_pe.v:29:30: Operator ADD expects 32 bits on the RHS, but RHS's VARREF 'product' generates 16 bits.
+                                        : ... note: In instance 'npu_axis_system_top.mm.array_i.GEN_ROW[7].GEN_COL[7].u_pe'
+   29 |                 acc   <= acc + product;
+      |                              ^
+%Warning-WIDTHTRUNC: rtl/matmul_controller.v:44:30: Operator ASSIGNW expects 16 bits on the Assign RHS, but Assign RHS's DIV generates 32 bits.
+                                                  : ... note: In instance 'npu_axis_system_top.mm.ctrl'
+   44 |     wire [15:0] m_tiles_calc = m_ceil_wide / N;
+      |                              ^
+%Warning-WIDTHTRUNC: rtl/matmul_controller.v:45:30: Operator ASSIGNW expects 16 bits on the Assign RHS, but Assign RHS's DIV generates 32 bits.
+                                                  : ... note: In instance 'npu_axis_system_top.mm.ctrl'
+   45 |     wire [15:0] n_tiles_calc = n_ceil_wide / N;
+      |                              ^
+%Warning-WIDTHEXPAND: rtl/npu_regs.v:117:67: Operator COND expects 32 bits on the Conditional True, but Conditional True's CONST '1'h1' generates 1 bits.
+                                           : ... note: In instance 'npu_axis_system_top.regs'
+  117 |                     last_job_cycles <= current_job_cycles + (busy ? 1'b1 : 1'b0);
+      |                                                                   ^
+%Warning-WIDTHEXPAND: rtl/npu_regs.v:117:67: Operator COND expects 32 bits on the Conditional False, but Conditional False's CONST '1'h0' generates 1 bits.
+                                           : ... note: In instance 'npu_axis_system_top.regs'
+  117 |                     last_job_cycles <= current_job_cycles + (busy ? 1'b1 : 1'b0);
+      |                                                                   ^
+%Warning-WIDTHEXPAND: rtl/conv2d_stream_engine.v:48:32: Operator ADD expects 32 bits on the RHS, but RHS's VARREF 'prod' generates 16 bits.
+                                                      : ... note: In instance 'npu_axis_system_top.cv.core'
+   48 |     assign sum_next = add_base + prod;
+      |                                ^
+%Warning-WIDTHEXPAND: rtl/axis_matmul_feeder.v:67:31: Operator ADD expects 32 bits on the LHS, but LHS's VARREF 'bias_beat' generates 8 bits.
+                                                    : ... note: In instance 'npu_axis_system_top.mm_feed'
+   67 |                 if (bias_beat + 1 >= BIAS_BEATS) begin
+      |                               ^
+%Warning-UNUSEDSIGNAL: rtl/npu_axis_system_top.v:120:17: Signal is not used: 'tile_m'
+                                                       : ... note: In instance 'npu_axis_system_top'
+  120 |     wire [15:0] tile_m,tile_n;
+      |                 ^~~~~~
+%Warning-UNUSEDSIGNAL: rtl/npu_axis_system_top.v:120:24: Signal is not used: 'tile_n'
+                                                       : ... note: In instance 'npu_axis_system_top'
+  120 |     wire [15:0] tile_m,tile_n;
+      |                        ^~~~~~
+%Warning-UNUSEDSIGNAL: rtl/axis_conv_adapter.v:5:17: Signal is not used: 'clk'
+                                                   : ... note: In instance 'npu_axis_system_top.cv_feed'
+    5 |     input  wire clk,
+      |                 ^~~
+%Warning-UNUSEDSIGNAL: rtl/axis_conv_adapter.v:6:17: Signal is not used: 'rst'
+                                                   : ... note: In instance 'npu_axis_system_top.cv_feed'
+    6 |     input  wire rst,
+      |                 ^~~
+%Warning-UNUSEDSIGNAL: rtl/axis_conv_adapter.v:8:30: Bits of signal are not used: 's_axis_tdata'[127:64,31:17]
+                                                   : ... note: In instance 'npu_axis_system_top.cv_feed'
+    8 |     input  wire [AXIS_W-1:0] s_axis_tdata,
+      |                              ^~~~~~~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/axis_elementwise_add_engine.v:9:30: Bits of signal are not used: 's_axis_tdata'[127:16]
+                                                             : ... note: In instance 'npu_axis_system_top.add_i'
+    9 |     input  wire [AXIS_W-1:0] s_axis_tdata,
+      |                              ^~~~~~~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/axis_maxpool2x2_engine.v:8:30: Bits of signal are not used: 's_axis_tdata'[127:8]
+                                                        : ... note: In instance 'npu_axis_system_top.pool_i'
+    8 |     input  wire [AXIS_W-1:0] s_axis_tdata,
+      |                              ^~~~~~~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/axis_tile_output.v:26:13: Signal is not driven, nor used: 'k'
+                                                   : ... note: In instance 'npu_axis_system_top.mm_out_axis'
+   26 |     integer k;
+      |             ^
+%Warning-UNUSEDSIGNAL: rtl/conv_stream_job_engine.v:33:20: Signal is not used: 'core_done'
+                                                         : ... note: In instance 'npu_axis_system_top.cv'
+   33 |     wire core_busy,core_done,core_ready;
+      |                    ^~~~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/npu_axi_lite_slave.v:37:13: Signal is not driven, nor used: 'i'
+                                                     : ... note: In instance 'npu_axis_system_top.ctrl_axi'
+   37 |     integer i;
+      |             ^
+%Warning-UNUSEDSIGNAL: rtl/conv2d_stream_engine.v:38:29: Signal is not used: 'pp_bias'
+                                                       : ... note: In instance 'npu_axis_system_top.cv.core'
+   38 |     wire signed [ACC_W-1:0] pp_bias;
+      |                             ^~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/conv2d_stream_engine.v:39:10: Signal is not used: 'pp_relu'
+                                                       : ... note: In instance 'npu_axis_system_top.cv.core'
+   39 |     wire pp_relu;
+      |          ^~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/conv2d_stream_engine.v:40:24: Signal is not used: 'pp_qmul'
+                                                       : ... note: In instance 'npu_axis_system_top.cv.core'
+   40 |     wire signed [31:0] pp_qmul;
+      |                        ^~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/conv2d_stream_engine.v:41:16: Signal is not used: 'pp_qshift'
+                                                       : ... note: In instance 'npu_axis_system_top.cv.core'
+   41 |     wire [5:0] pp_qshift;
+      |                ^~~~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/conv2d_stream_engine.v:42:30: Signal is not used: 'pp_zero_point'
+                                                       : ... note: In instance 'npu_axis_system_top.cv.core'
+   42 |     wire signed [DATA_W-1:0] pp_zero_point;
+      |                              ^~~~~~~~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/npu_regs.v:9:23: Bits of signal are not used: 'wr_addr'[1:0]
+                                          : ... note: In instance 'npu_axis_system_top.regs'
+    9 |     input  wire [5:0] wr_addr,
+      |                       ^~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/npu_regs.v:13:23: Bits of signal are not used: 'rd_addr'[1:0]
+                                           : ... note: In instance 'npu_axis_system_top.regs'
+   13 |     input  wire [5:0] rd_addr,
+      |                       ^~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/npu_regs.v:66:17: Bits of signal are not used: 'm_merged'[31:16]
+                                           : ... note: In instance 'npu_axis_system_top.regs'
+   66 |     wire [31:0] m_merged = merge_wstrb({16'd0,M},wr_data,wr_strb);
+      |                 ^~~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/npu_regs.v:67:17: Bits of signal are not used: 'n_merged'[31:16]
+                                           : ... note: In instance 'npu_axis_system_top.regs'
+   67 |     wire [31:0] n_merged = merge_wstrb({16'd0,Ndim},wr_data,wr_strb);
+      |                 ^~~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/npu_regs.v:68:17: Bits of signal are not used: 'k_merged'[31:16]
+                                           : ... note: In instance 'npu_axis_system_top.regs'
+   68 |     wire [31:0] k_merged = merge_wstrb({16'd0,K},wr_data,wr_strb);
+      |                 ^~~~~~~~
+%Warning-UNUSEDSIGNAL: rtl/systolic_array.v:14:38: Bits of signal are not used: 'a_pipe'[575:568,503:496,431:424,359:352,287:280,215:208,143:136,71:64]
+                                                 : ... note: In instance 'npu_axis_system_top.mm.array_i'
+   14 |     wire signed [N*(N+1)*DATA_W-1:0] a_pipe;
+      |                                      ^~~~~~
+%Warning-UNUSEDSIGNAL: rtl/systolic_array.v:15:38: Bits of signal are not used: 'b_pipe'[575:512]
+                                                 : ... note: In instance 'npu_axis_system_top.mm.array_i'
+   15 |     wire signed [(N+1)*N*DATA_W-1:0] b_pipe;
+      |                                      ^~~~~~

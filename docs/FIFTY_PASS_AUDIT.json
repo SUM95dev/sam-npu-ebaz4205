@@ -1,0 +1,306 @@
+{
+  "passed": 50,
+  "total": 50,
+  "checks": [
+    {
+      "pass": 1,
+      "name": "RTL files present",
+      "ok": true,
+      "detail": "29"
+    },
+    {
+      "pass": 2,
+      "name": "Simulation files present",
+      "ok": true,
+      "detail": "55"
+    },
+    {
+      "pass": 3,
+      "name": "No duplicate RTL module names",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "pass": 4,
+      "name": "Module exists: npu_axis_system_top",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 5,
+      "name": "Module exists: npu_v4_top",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 6,
+      "name": "Module exists: matmul_engine",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 7,
+      "name": "Module exists: conv_stream_job_engine",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 8,
+      "name": "Module exists: conv2d_gemm_feeder",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 9,
+      "name": "Module exists: shared_postprocess",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 10,
+      "name": "No merge conflict markers",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 11,
+      "name": "Balanced parentheses",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "pass": 12,
+      "name": "Balanced brackets",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "pass": 13,
+      "name": "Balanced braces",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "pass": 14,
+      "name": "Balanced begin/end",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "pass": 15,
+      "name": "Balanced module/endmodule",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "pass": 16,
+      "name": "Named-port audit zero issues",
+      "ok": true,
+      "detail": "modules 29 instances 55 issues 0"
+    },
+    {
+      "pass": 17,
+      "name": "All Python files compile",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "pass": 18,
+      "name": "Numerical golden model",
+      "ok": true,
+      "detail": "PASS numerical golden tests"
+    },
+    {
+      "pass": 19,
+      "name": "Systolic cycle audit",
+      "ok": true,
+      "detail": "PASS: 1000 random matrix shapes, all tiles, random stalls"
+    },
+    {
+      "pass": 20,
+      "name": "Self-test vector generation",
+      "ok": true,
+      "detail": "/tmp/npu_selftest.json"
+    },
+    {
+      "pass": 21,
+      "name": "SNPU model packer",
+      "ok": true,
+      "detail": "/tmp/npu_model.snpu"
+    },
+    {
+      "pass": 22,
+      "name": "SNPU model magic",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 23,
+      "name": "MatMul packer randomized framing",
+      "ok": true,
+      "detail": "200 cases"
+    },
+    {
+      "pass": 24,
+      "name": "Conv packer output shape",
+      "ok": true,
+      "detail": "(2, 2, 1)"
+    },
+    {
+      "pass": 25,
+      "name": "INT32 accumulator max-K bound",
+      "ok": true,
+      "detail": "1073725440"
+    },
+    {
+      "pass": 26,
+      "name": "Feed-step width covers K+N-2",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 27,
+      "name": "N=1 flush formula",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 28,
+      "name": "N=8 flush formula",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 29,
+      "name": "MatMul controller has output_ready",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 30,
+      "name": "MatMul engine propagates output_ready",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 31,
+      "name": "Tile serializer snapshots payload",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 32,
+      "name": "Tile serializer job-level TLAST",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 33,
+      "name": "AXI read uses pending stage",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 34,
+      "name": "AXI WSTRB propagated",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 35,
+      "name": "Conv geometry divide-by-zero guard",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 36,
+      "name": "Conv geometry underflow guard",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 37,
+      "name": "Conv stream separates sample-last/job-last",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 38,
+      "name": "Conv stream has output backpressure",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 39,
+      "name": "Conv GEMM feeder data-valid alignment",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 40,
+      "name": "Conv systolic reuses matmul engine",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 41,
+      "name": "Conv systolic size guard",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 42,
+      "name": "Legacy broken frontend removed from RTL",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 43,
+      "name": "Linux UIO userspace C syntax",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 44,
+      "name": "Linux DMA test C syntax",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 45,
+      "name": "Vivado script testbench names exist",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "pass": 46,
+      "name": "Vivado synthesis top exists",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 47,
+      "name": "Vivado part is XC7Z010 CLG400",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 48,
+      "name": "Board DDR config not fabricated",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 49,
+      "name": "Hardware verification limitation documented",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "pass": 50,
+      "name": "Final ZIP CRC integrity",
+      "ok": true,
+      "detail": "None"
+    }
+  ]
+}

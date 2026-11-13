@@ -1,0 +1,26 @@
+INFO: project BOARD_PART=mock:ebaz4205:1.0
+INFO: PS7 board preset applied.
+INFO: EBAZ PHY reference clock output disabled (assumes onboard Y3/oscillator is present).
+============================================================
+Sam NPU EBAZ4205 block design created and validated structurally.
+Control: PS M_AXI_GP0 -> NPU + AXI DMA S_AXI_LITE
+Data: DDR/HP0 <-> AXI DMA <-> NPU AXI-Stream
+Clock: FCLK_CLK0 = 100 MHz
+Ethernet: PS GEM0/EMIO <-> IP101GA PHY (4-bit MII), TCP/IP handled by ARM/Linux
+PHY 25MHz from PL: 0
+NPU control: 0x43C00000 / 64K
+DMA control: 0x40400000 / 64K
+============================================================
+FAIL DMA length width not 23
+    while executing
+"error "FAIL DMA length width not 23""
+    invoked from within
+"if {![dict exists $configs axi_dma_0 CONFIG.c_sg_length_width] || [dict get $configs axi_dma_0 CONFIG.c_sg_length_width] != 23} {error "FAIL DMA lengt..."
+    (file "/tmp/tmpq9mx_pfj.tcl" line 24)
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_DEEP_REVIEW/verification/deep/test_bd_contract.py", line 41, in <module>
+    f.write(script);f.flush();subprocess.run([os.environ.get('TCLSH','tclsh'),f.name],check=True)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/tmp/snpu_hdl/tcl/usr/bin/tclsh8.6', '/tmp/tmpq9mx_pfj.tcl']' returned non-zero exit status 1.

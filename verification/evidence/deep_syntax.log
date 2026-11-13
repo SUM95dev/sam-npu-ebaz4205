@@ -1,0 +1,3 @@
+PASS all Python source syntax
+PASS all shell source syntax
+PASS all six Tcl scripts structural completeness (not Vivado execution)

@@ -1,0 +1,156 @@
+{
+  "passes": 5,
+  "checks": [
+    {
+      "pass": 1,
+      "name": "all textual source files readable/nonempty",
+      "ok": true,
+      "detail": "201 files; bad=[]"
+    },
+    {
+      "pass": 1,
+      "name": "no merge conflict markers",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "pass": 1,
+      "name": "named-port consistency",
+      "ok": true,
+      "detail": "modules 29 instances 55 issues 0"
+    },
+    {
+      "pass": 1,
+      "name": "legacy 50-point audit still clean",
+      "ok": true,
+      "detail": "RESULT 50 /50"
+    },
+    {
+      "pass": 2,
+      "name": "Conv memory geometry guarded",
+      "ok": true,
+      "detail": "stride/kernel/padded-width guard"
+    },
+    {
+      "pass": 2,
+      "name": "Conv memory rejects unsolicited responses",
+      "ok": true,
+      "detail": "responses tied to outstanding/same-cycle request"
+    },
+    {
+      "pass": 2,
+      "name": "Conv feeder guards variable divide/modulo",
+      "ok": true,
+      "detail": "zero-dimension guards present"
+    },
+    {
+      "pass": 2,
+      "name": "MatMul system DONE waits for AXIS drain",
+      "ok": true,
+      "detail": "serializer included in BUSY/DONE contract"
+    },
+    {
+      "pass": 2,
+      "name": "randomized MatMul cycle audit",
+      "ok": true,
+      "detail": "PASS: 1000 random matrix shapes, all tiles, random stalls"
+    },
+    {
+      "pass": 3,
+      "name": "all testbenches are in Vivado list",
+      "ok": true,
+      "detail": "files=55 listed=55 missing=[] extra=[]"
+    },
+    {
+      "pass": 3,
+      "name": "every TB has explicit PASS and FAIL markers",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "pass": 3,
+      "name": "Vivado flow parses simulator logical result",
+      "ok": true,
+      "detail": "simulate.log checked"
+    },
+    {
+      "pass": 3,
+      "name": "no unbounded run-all regression",
+      "ok": true,
+      "detail": "finite XSim runtime"
+    },
+    {
+      "pass": 4,
+      "name": "Ethernet pin map",
+      "ok": true,
+      "detail": "ETHERNET PIN AUDIT PASS: 14/14 mapped pins match known EBAZ4205 map"
+    },
+    {
+      "pass": 4,
+      "name": "GEM0 EMIO/MII integration configured",
+      "ok": true,
+      "detail": "PS GEM0 via EMIO"
+    },
+    {
+      "pass": 4,
+      "name": "deterministic 64KiB control maps",
+      "ok": true,
+      "detail": "NPU/DMA control windows"
+    },
+    {
+      "pass": 4,
+      "name": "MII clocks constrained",
+      "ok": true,
+      "detail": "25 MHz external clocks"
+    },
+    {
+      "pass": 4,
+      "name": "implementation guarded by real board preset",
+      "ok": true,
+      "detail": "refuses guessed DDR/MIO"
+    },
+    {
+      "pass": 4,
+      "name": "bitstream helper uses canonical guarded build",
+      "ok": true,
+      "detail": "single source of truth"
+    },
+    {
+      "pass": 5,
+      "name": "userspace C builds warning-free",
+      "ok": true,
+      "detail": "3 binaries"
+    },
+    {
+      "pass": 5,
+      "name": "DMA RX mmap offset normalized",
+      "ok": true,
+      "detail": "separate coherent RX allocation"
+    },
+    {
+      "pass": 5,
+      "name": "DMA device single-owner and close-safe",
+      "ok": true,
+      "detail": "pending DMA cannot survive owner close"
+    },
+    {
+      "pass": 5,
+      "name": "UIO fragment does not overwrite bootargs",
+      "ok": true,
+      "detail": "existing kernel cmdline preserved"
+    },
+    {
+      "pass": 5,
+      "name": "network server validates MatMul DMA sizes",
+      "ok": true,
+      "detail": "framing/alignment enforced"
+    },
+    {
+      "pass": 5,
+      "name": "host/network MatMul packers agree",
+      "ok": true,
+      "detail": "200 random matrix shapes, mixed bias/no-bias"
+    }
+  ],
+  "failed": 0
+}
