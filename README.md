@@ -16,8 +16,8 @@
 </div>
 
 A small INT8 NPU built around an **8x8 systolic multiply-accumulate array**, with the host software needed to
-quantize a model, pack it into a `.snpu` file and run it on the board. It was written with ChatGPT, then reviewed,
-fixed and brought up on real hardware with Claude. The numbers below come from that real board.
+quantize a model, pack it into a `.snpu` file and run it on the board. The numbers below were measured on a real
+EBAZ4205.
 
 ## Results (measured on a real EBAZ4205)
 
