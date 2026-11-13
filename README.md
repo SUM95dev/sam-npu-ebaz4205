@@ -1,53 +1,90 @@
-# Sam NPU for EBAZ4205 (Zynq-7010)
+<div align="center">
 
-INT8 8x8 systolic-array NPU in Verilog, with host/Linux/PYNQ software and Vivado 2020.2 build scripts.
-Written with ChatGPT, reviewed/fixed with Claude, and run on a real EBAZ4205 board.
+# Sam NPU
 
-## Status (hardware-verified, see [docs/PYNQ_BRINGUP.md](docs/PYNQ_BRINGUP.md))
-- Routed timing met in Vivado 2020.2: setup WNS +0.593 ns, hold WHS +0.019 ns (bitstream built).
-- On a real board (PYNQ 2.4): self-test, MatMul/Conv comparisons against a soft reference and an independent
-  numpy model, a 300-job stress run and a digit-recognition demo (117/120 correct, outputs bit-identical to the
-  reference) all passed.
-- Not verified: long-duration stability, real FCLK frequency (100 MHz assumed in GOPS numbers), Ethernet on the
-  board (no eth0 with the stock PYNQ image), large/real models (the ONNX converter is incomplete).
-- Measured: ~5.8 GOPS hardware throughput on a 64x128x64 MatMul (100 MHz assumed); the Python server is ~150x slower end to end.
+**An INT8 neural-network accelerator in Verilog, running on a $10 FPGA board.**
 
-Everything below is the original project README (REVIEW50 text) and predates the hardware tests above.
+8x8 systolic array · Zynq-7010 (EBAZ4205) · Vivado 2020.2 · PYNQ · MatMul, Conv, MaxPool, Add
 
----
+![License](https://img.shields.io/badge/license-MIT-blue)
+![FPGA](https://img.shields.io/badge/FPGA-Zynq--7010-orange)
+![Vivado](https://img.shields.io/badge/Vivado-2020.2-purple)
+![Status](https://img.shields.io/badge/status-runs%20on%20real%20hardware-brightgreen)
 
-# Sam NPU — REVIEW50 candidate
+<img src="docs/images/digits_result.png" alt="Digits recognised by the NPU on a real board" width="880">
 
-Read [REVIEW50.md](REVIEW50.md) first for this revision. Its 50 directed host checks and the existing 55 RTL regressions passed. No fresh Vivado timing or physical-board acceptance is claimed.
+</div>
 
-This revision changes host networking software and verification relative to DEEP_REVIEW. Keep a running older build intact until its logs can be reviewed.
+A small INT8 NPU built around an **8x8 systolic multiply-accumulate array**, with the host software needed to
+quantize a model, pack it into a `.snpu` file and run it on the board. It was written with ChatGPT, then reviewed,
+fixed and brought up on real hardware with Claude. The numbers below come from that real board.
 
-- [DEEP_REVIEW.md](DEEP_REVIEW.md): preceding RTL/DMA/BD changes and hardware acceptance requirements.
-- [README_FULL_SYSTEM.md](README_FULL_SYSTEM.md): system overview; historical details must be checked against current source.
-- Build: `bash scripts/build_ebaz4205_final.sh`
-- Host checks: `python3 verification/review50/run_50_checks.py`
-- Full static/software gate: `bash scripts/validate_release.sh`
+## Results (measured on a real EBAZ4205)
 
-Older audit reports are historical evidence for their named versions, not a substitute for a new routed implementation and board test.
+| What | Result |
+|---|---|
+| Timing (routed, Vivado 2020.2) | setup **WNS +0.593 ns**, hold **WHS +0.019 ns** |
+| Resources (post-synthesis) | 7,629 LUT (43%), 8,480 FF (24%), 72 / 80 DSP (90%) |
+| Hardware throughput | **~5.8 GOPS** on a 64x128x64 MatMul (peak 12.8 GOPS) - *assumes a 100 MHz clock* |
+| Digit recognition demo | **117 / 120** correct on the board, outputs **bit-identical** to the reference model |
+| MatMul vs independent numpy model | 14 / 14 cases identical, incl. -128 / +127 extremes |
+| Stress | 300 consecutive jobs, 0 errors |
 
+## Architecture
 
-## Direct network Conv2D helper (host lowers spatial windows)
+<img src="docs/images/architecture.svg" alt="System block diagram" width="880">
 
-The host client now exposes `NpuSession.conv_nhwc(...)` and a `conv` CLI
-subcommand. Input tensors are NHWC and weights are OHWI; the host creates the
-streaming MAC sequence while the FPGA performs the INT8 dot products and
-post-processing. This is not a claim that the unused legacy memory-address
-Conv2D scheduler is integrated into the production datapath. Example JSON:
+Data goes DDR -> AXI DMA -> NPU -> AXI DMA -> DDR. The ARM core programs the NPU through AXI-Lite registers.
+The array computes INT8 x INT8 products with 32-bit accumulation; a post-process stage applies bias, a per-tensor
+scale (`qmul`, `qshift`, zero point), ReLU and saturates back to INT8.
 
-```json
-{
-  "input": [[[1], [2]], [[3], [4]]],
-  "weights": [[[[2]]]],
-  "stride": 1,
-  "pad": 0,
-  "groups": 1,
-  "bias": [0]
-}
-```
+## Quick start (PYNQ on EBAZ4205)
 
-Run with `python3 sw/host/npu_net_client.py 192.168.50.2 conv conv.json`.
+1. Build the bitstream with Vivado 2020.2: `bash scripts/build_ebaz4205_final.sh`
+   (boards without the 25 MHz PHY crystal: `scripts/build_ebaz4205_no_y3.sh`, see the notes in that script).
+2. Copy `sam_npu.bit` + `sam_npu.hwh` (from the exported `.xsa`) and `sw/` to the board.
+3. On the board, start the server and run the self-test:
+   ```bash
+   sudo -E python3 sw/host/npu_pynq_server2.py sam_npu.bit 9505 127.0.0.1 &
+   python3 sw/host/npu_board_selftest.py 127.0.0.1
+   ```
+4. Try the demos: `sw/demo/digits_all.py` (digit recognition) and `sw/demo/chat_all.py` (a tiny intent chatbot whose
+   "brain" runs on the NPU).
+
+Step-by-step bring-up notes, including the UART + SD-card workflow and the systemd auto-start unit
+(`scripts/npu.service`), are in [docs/PYNQ_BRINGUP.md](docs/PYNQ_BRINGUP.md).
+
+## Repository layout
+
+| Path | Contents |
+|---|---|
+| `rtl/` | Verilog: systolic array, feeder, post-process, Conv/Pool/Add engines, AXI wrappers |
+| `sim/`, `verification/` | testbenches and Python checks (`validate_release.sh`, `verification/review51/`) |
+| `scripts/` | Vivado project / block-design / build scripts, board support fetcher, `npu.service` |
+| `sw/` | model packer, `.snpu` loader, host runtime, PYNQ server, benchmarks, demos |
+| `docs/` | design notes, model format, bring-up guide |
+
+## Honest limitations
+
+- **Small models only so far.** Verified with MatMul-based networks. Conv, MaxPool and Add were checked against the
+  project's own reference model on the board, not yet against an independent one.
+- **The Python server is the bottleneck.** The array itself takes ~0.18 ms for a 64x128x64 MatMul, but a request
+  through the Python server takes ~28 ms.
+- **The clock is assumed to be 100 MHz** in the GOPS numbers; the real FCLK was not read back.
+- **No long-duration or temperature testing.**
+- **Ethernet did not come up** with the stock PYNQ image on the test board (the PHY was not detected); the board is
+  driven over UART, with files moved on an SD card.
+- **The ONNX converter is incomplete** (quantization, NCHW / NHWC), so there is no one-click path from a PyTorch /
+  ONNX model yet.
+
+## Roadmap
+
+- C / numpy server to remove the Python bottleneck
+- Small CNN (Conv + Pool) demo on real image data
+- Complete the ONNX -> `.snpu` converter
+- Fix Ethernet (PHY clock from the PL)
+- Long-run stability and power measurements
+
+## License
+
+MIT - see [LICENSE](LICENSE). The original project notes are kept in [docs/PROJECT_NOTES.md](docs/PROJECT_NOTES.md).
