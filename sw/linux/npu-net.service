@@ -1,0 +1,11 @@
+[Unit]
+Description=Sam NPU TCP accelerator service
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/npu_net_server 9505 /dev/uio0 /dev/npu_dma
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

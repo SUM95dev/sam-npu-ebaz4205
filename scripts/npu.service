@@ -1,0 +1,12 @@
+[Unit]
+Description=Sam NPU server (loads bitstream, listens on 127.0.0.1:9505)
+
+[Service]
+Type=simple
+WorkingDirectory=/home/xilinx
+ExecStart=/bin/bash -lc 'exec python3 /home/xilinx/npu_pynq_server2.py /home/xilinx/sam_npu.bit 9505 127.0.0.1'
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

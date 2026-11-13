@@ -1,0 +1,108 @@
+[1/7] Five-pass baseline audit
+P1 PASS all textual source files readable/nonempty: 133 files; bad=[]
+P1 PASS no merge conflict markers: []
+P1 PASS named-port consistency: modules 28 instances 55 issues 0
+P1 PASS legacy 50-point audit still clean: RESULT 50 /50
+P2 PASS Conv memory geometry guarded: stride/kernel/padded-width guard
+P2 PASS Conv memory rejects unsolicited responses: responses tied to outstanding/same-cycle request
+P2 PASS Conv feeder guards variable divide/modulo: zero-dimension guards present
+P2 PASS MatMul system DONE waits for AXIS drain: serializer included in BUSY/DONE contract
+P2 PASS randomized MatMul cycle audit: PASS: 1000 random matrix shapes, all tiles, random stalls
+P3 PASS all testbenches are in Vivado list: files=28 listed=28 missing=[] extra=[]
+P3 PASS every TB has explicit PASS and FAIL markers: []
+P3 PASS Vivado flow parses simulator logical result: simulate.log checked
+P3 PASS no unbounded run-all regression: finite XSim runtime
+P4 PASS Ethernet pin map: ETHERNET PIN AUDIT PASS: 14/14 mapped pins match known EBAZ4205 map
+P4 PASS GEM0 EMIO/MII integration configured: PS GEM0 via EMIO
+P4 PASS deterministic 64KiB control maps: NPU/DMA control windows
+P4 PASS MII clocks constrained: 25 MHz external clocks
+P4 PASS implementation guarded by real board preset: refuses guessed DDR/MIO
+P4 PASS bitstream helper uses canonical guarded build: single source of truth
+P5 PASS userspace C builds warning-free: 3 binaries
+P5 PASS DMA RX mmap offset normalized: separate coherent RX allocation
+P5 PASS DMA device single-owner and close-safe: pending DMA cannot survive owner close
+P5 PASS UIO fragment does not overwrite bootargs: existing kernel cmdline preserved
+P5 PASS network server validates MatMul DMA sizes: framing/alignment enforced
+P5 PASS host/network MatMul packers agree: 200 random matrix shapes, mixed bias/no-bias
+FIVE_PASS_SOURCE_AUDIT PASS: 25/25 checks
+[2/7] Final v2 release audit
+PASS legacy five-pass audit :: already executed by outer validator
+PASS exists rtl/axis_maxpool2x2_engine.v
+PASS exists rtl/axis_elementwise_add_engine.v
+PASS exists sim/tb_regs_extended.v
+PASS exists sim/tb_conv_stream_bias.v
+PASS exists sim/tb_axis_maxpool.v
+PASS exists sim/tb_axis_add.v
+PASS exists sim/tb_matmul_bias_feeder.v
+PASS exists sw/host/npu_board_selftest.py
+PASS exists sw/host/npu_benchmark.py
+PASS exists sw/snpu_inspect.py
+PASS hardware identity registers
+PASS hardware perf counters
+PASS hardware IRQ + abort
+PASS four hardware modes
+PASS streamed MatMul/Dense bias integrated
+PASS Conv per-output bias stream
+PASS NPU IRQ wired into PS concat
+PASS 28-test Vivado suite :: files=28 listed=28
+PASS new tests have PASS/FAIL
+PASS all Python compiles
+PASS userspace C warning-clean
+PASS grouped/depthwise Conv packet contract :: 104 randomized cases
+PASS Add packet framing
+PASS MaxPool packet framing
+PASS MatMul streamed bias framing :: bytes=176 shape=(2, 2, 2)
+PASS board selftest dry-run :: packet bytes: {'mm': 176, 'add': 48, 'pool': 128, 'conv': 64, 'dw': 32}
+PASS dry-run packet/golden construction
+PASS SNPU strict pack+inspect :: SNPU v2 layers=2 bytes=36
+000: {'type': 'matmul', 'M': 2, 'N': 2, 'K': 2, 'weights': 4, 'bias': 2}
+001: {'type': 'relu'}
+VALID
+PASS model packer rejects out-of-range INT8
+PASS ONNX converter rejects silent float quantization
+PASS persistent network session + benchmark
+PASS network opcodes INFO/MatMul/Conv/Pool/Add
+PASS network capability skew guard
+PASS network MatMul bias flag
+PASS network timeout abort path
+PASS network Conv framing validation
+FINAL_RELEASE_AUDIT PASS: 36/36
+[3/7] Second independent five-pass audit
+PASS P1 unique RTL module definitions :: {}
+PASS P1 production hierarchy reaches every required engine :: reachable=17
+PASS P1 production hierarchy size stable :: 17 modules
+PASS P1 dead RTL is explicitly legacy/research only :: axis_scalar_output,conv2d_addrgen,conv2d_gemm_feeder,conv2d_memory_top,conv2d_scheduler,conv2d_systolic_engine,double_buffer_ctrl,maxpool2x2,npu_v4_top,perf_counters,shared_postprocess
+PASS P1 no merge-conflict markers
+PASS P1 production top exposes control + input/output streams
+PASS P2 MatMul packer parameterized framing + strict INT8
+PASS P2 network MatMul enforces fixed 8x8 + exact INT8 range
+PASS P2 Conv packer guards INT32 accumulator MAC bound
+PASS P2 network Conv stream guards accumulator + unterminated scalar
+PASS P2 legacy Conv arithmetic widened before size checks
+PASS P2 postprocess preserves 33x32 widened arithmetic
+PASS P3 C MatMul tile->row-major converter test :: PASS MatMul tile-major -> row-major layout
+PASS P3 randomized multi-tile output layout contract :: 300 shapes
+PASS P3 server exposes row-major MatMul network ABI
+PASS P3 multi-tile hardware-order regression is in XSim suite
+PASS P3 strict Vivado suite is exactly 28 existing tests :: files=28 listed=28
+PASS P3 XSim Tcl checks logical PASS/FAIL, not process exit only
+PASS P4 userspace C warning-clean after contract fixes
+PASS P4 UIO diagnostic never STARTs an unarmed DMA job
+PASS P4 bare-metal example matches 32-bit DMA result + tile-major layout
+PASS P4 deploy packers contain no silent INT8 clamp
+PASS P4 DMA driver retains ownership/close safety markers
+PASS P4 network timeout/error path aborts DMA/NPU
+PASS P5 deterministic 64K NPU/DMA control address map
+PASS P5 implementation refuses unconfirmed EBAZ PS7/DDR preset
+PASS P5 implementation has explicit setup+hold timing failure gate
+PASS P5 removed known Vivado-2020.2/script regressions
+PASS P5 all Python sources parse
+PASS P5 canonical build gates 28/28 before implementation
+SECOND_FIVE_PASS_AUDIT PASS: 30/30 checks
+[4/7] Python syntax (no pycache writes)
+Python syntax PASS
+[5/7] Required integrated release files
+[6/7] Tcl/text regressions
+[7/7] C builds + optional kernel-module compile
+kernel module compile PASS against /usr/src/linux-headers-6.12.107+deb13-amd64
+FINAL RELEASE STATIC VALIDATION PASS

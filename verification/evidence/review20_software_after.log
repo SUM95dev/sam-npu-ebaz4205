@@ -1,0 +1,16 @@
+test_bad_header_and_disconnect (__main__.Tests.test_bad_header_and_disconnect) ... ok
+test_conv_geometry (__main__.Tests.test_conv_geometry) ... ok
+test_empty_model (__main__.Tests.test_empty_model) ... ok
+test_fragmented_reply (__main__.Tests.test_fragmented_reply) ... ok
+test_integer_boundaries (__main__.Tests.test_integer_boundaries) ... ok
+test_integer_fidelity (__main__.Tests.test_integer_fidelity) ... ok
+test_onnx_spatial_attributes (__main__.Tests.test_onnx_spatial_attributes) ... ok
+test_reply_size (__main__.Tests.test_reply_size) ... ok
+test_stream_packers_agree (__main__.Tests.test_stream_packers_agree) ... ok
+test_valid_model_truncation (__main__.Tests.test_valid_model_truncation) ... ok
+test_zero_matmul (__main__.Tests.test_zero_matmul) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.007s
+
+OK

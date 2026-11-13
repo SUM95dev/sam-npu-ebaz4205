@@ -1,0 +1,589 @@
+--- previous/rtl/conv_stream_job_engine.v
++++ review20/rtl/conv_stream_job_engine.v
+@@ -37,7 +37,10 @@
+ 
+     // Do not accept a new sample during the cycle in which the previous
+     // output arrives. This gives the one-entry output buffer an unambiguous handoff.
+-    assign sample_ready = job_active && !core_out_valid && (!core_busy || core_ready) &&
++    // The final input ends the job even while its result is still in flight.
++    // Fence following input until completion and a fresh START.
++    assign sample_ready = job_active && !final_output_pending && !(out_valid && out_last) &&
++                          !core_out_valid && (!core_busy || core_ready) &&
+                           (!last_sample || output_space);
+     wire fire = sample_valid && sample_ready;
+     // core_start is true only for the first accepted sample of each output scalar.
+--- previous/sw/host/npu_net_client.py
++++ review20/sw/host/npu_net_client.py
+@@ -1,5 +1,7 @@
+ #!/usr/bin/env python3
+ """TCP client/runtime helpers for the Sam NPU EBAZ4205 network accelerator."""
++from operator import index as integer
++
+ import argparse, json, socket, struct
+ 
+ MAGIC=b"SNPU"; VERSION=1
+@@ -18,13 +20,13 @@
+     return bytes(b)
+ 
+ def as_i8(v,label="value"):
+-    v=int(v)
++    v=integer(v)
+     if v < -128 or v > 127:
+         raise ValueError(f"{label}={v} is outside signed INT8 range")
+     return v
+ 
+ def as_i32(v,label="value"):
+-    v=int(v)
++    v=integer(v)
+     if v < -(1<<31) or v > (1<<31)-1:
+         raise ValueError(f"{label}={v} is outside signed INT32 range")
+     return v
+@@ -90,7 +92,8 @@
+     def __enter__(self): return self.connect()
+     def __exit__(self,*_): self.close()
+     def request(self,opcode,M=0,N=0,K=0,payload=b'',out_bytes=0,relu=False,qmul=1,qshift=0,zp=0,request_id=None,extra_flags=0):
+-        if not (0 <= int(qshift) <= 63): raise ValueError("qshift must be 0..63")
++        qshift=integer(qshift)
++        if not (0 <= qshift <= 63): raise ValueError("qshift must be 0..63")
+         as_i8(zp,"zero_point")
+         as_i32(qmul,"qmul")
+         self.connect()
+@@ -105,6 +108,9 @@
+             magic,rid,status,n=REP.unpack(rep)
+             if magic!=b"SNPR" or rid!=request_id: raise RuntimeError("bad reply header")
+             if status!=0: raise RuntimeError(f"NPU server status {status}")
++            expected = INFO.size if opcode == OP_INFO else out_bytes
++            if n != expected:
++                raise RuntimeError(f"unexpected reply size {n}, expected {expected}")
+             return recv_exact(self.sock,n)
+         except Exception:
+             self.close()
+--- previous/sw/model_packer.py
++++ review20/sw/model_packer.py
+@@ -1,19 +1,21 @@
+ #!/usr/bin/env python3
+ """Strict packer for the compact SNPU v2 weight/layer package."""
++from operator import index as integer
++
+ import json, struct, argparse
+ 
+ MAGIC=b"SNPU"; VERSION=2
+ OP_MATMUL=1; OP_CONV2D=2; OP_RELU=3; OP_MAXPOOL2=4; OP_ADD=5
+ 
+ def require_u16(v,name,allow_zero=False):
+-    v=int(v)
++    v=integer(v)
+     if v<0 or v>65535 or (not allow_zero and v==0): raise ValueError(f"{name} must be {'0..' if allow_zero else '1..'}65535")
+     return v
+ 
+ def as_i8(vals,name):
+     out=[]
+     for i,v in enumerate(vals):
+-        v=int(v)
++        v=integer(v)
+         if v < -128 or v > 127: raise ValueError(f"{name}[{i}]={v} is outside signed INT8 range")
+         out.append(v)
+     return out
+@@ -21,7 +23,7 @@
+ def as_i32(vals,name):
+     out=[]
+     for i,v in enumerate(vals):
+-        v=int(v)
++        v=integer(v)
+         if v < -(1<<31) or v > (1<<31)-1: raise ValueError(f"{name}[{i}]={v} is outside signed INT32 range")
+         out.append(v)
+     return out
+@@ -51,7 +53,7 @@
+             b += struct.pack("<I",len(bias)); b += struct.pack(f"<{len(bias)}i",*bias)
+         elif typ in ("conv2d","depthwiseconv2d"):
+             H=require_u16(L["in_h"],f"layer {li} in_h"); W=require_u16(L["in_w"],f"layer {li} in_w"); C=require_u16(L["in_c"],f"layer {li} in_c"); O=require_u16(L["out_c"],f"layer {li} out_c")
+-            G=int(L.get("groups",C if typ=="depthwiseconv2d" else 1)); Kh=int(L["k_h"]); Kw=int(L["k_w"]); S=int(L.get("stride",1)); P=int(L.get("pad",0))
++            G=integer(L.get("groups",C if typ=="depthwiseconv2d" else 1)); Kh=integer(L["k_h"]); Kw=integer(L["k_w"]); S=integer(L.get("stride",1)); P=integer(L.get("pad",0))
+             if not (1<=G<=65535 and C%G==0 and O%G==0): raise ValueError(f"layer {li} invalid Conv groups")
+             if not (1<=Kh<=255 and 1<=Kw<=255 and 1<=S<=255 and 0<=P<=255): raise ValueError(f"layer {li} Conv kernel/stride/pad exceeds package byte fields")
+             if H+2*P<Kh or W+2*P<Kw: raise ValueError(f"layer {li} Conv kernel exceeds padded input")
+--- previous/sw/npu_baremetal_example.c
++++ review20/sw/npu_baremetal_example.c
+@@ -1,5 +1,6 @@
+ #include "xparameters.h"
+ #include "xil_io.h"
++#include "xil_cache.h"
+ #include "xaxidma.h"
+ #include <stdint.h>
+ #include <stdio.h>
+@@ -32,8 +33,21 @@
+     return Xil_In32(NPU_CTRL_BASE + off);
+ }
+ 
++#ifndef NPU_POLL_LIMIT
++#define NPU_POLL_LIMIT 100000000u
++#endif
++
++/* A failure cancels both DMA directions; an outstanding RX must not survive. */
++static int npu_cancel_dma(XAxiDma *dma, int status) {
++    npu_wr(REG_CMD, 1u<<4);
++    XAxiDma_Reset(dma);
++    for (uint32_t n=0; n<NPU_POLL_LIMIT; ++n)
++        if (XAxiDma_ResetIsDone(dma)) return status;
++    return -6; /* DMA reset failed: caller must recover hardware before reuse */
++}
++
+ static int npu_wait_done(void) {
+-    for (uint32_t timeout=0; timeout<100000000u; ++timeout) {
++    for (uint32_t timeout=0; timeout<NPU_POLL_LIMIT; ++timeout) {
+         uint32_t s=npu_rd(REG_CTRL);
+         if (s & (1u<<2)) return -2; /* config error */
+         if (s & (1u<<1)) return 0;  /* sticky done */
+@@ -54,6 +68,13 @@
+                uint32_t *result_words, uint32_t result_bytes,
+                uint16_t M, uint16_t N, uint16_t K)
+ {
++    uint64_t expected_feed = ((uint64_t)M+7u)/8u * (((uint64_t)N+7u)/8u) * ((uint64_t)K+7u)*16u;
++    if (!dma || !feed || !result_words || !M || !N || !K ||
++        expected_feed != feed_bytes || (uint64_t)M*N*4u != result_bytes) return -7;
++    if ((npu_rd(REG_CTRL) & 1u) ||
++        XAxiDma_Busy(dma, XAXIDMA_DMA_TO_DEVICE) ||
++        XAxiDma_Busy(dma, XAXIDMA_DEVICE_TO_DMA)) return -8;
++
+     npu_wr(REG_M, M);
+     npu_wr(REG_N, N);
+     npu_wr(REG_K, K);
+@@ -63,16 +84,23 @@
+     npu_wr(REG_ZP, 0);
+ 
+     Xil_DCacheFlushRange((UINTPTR)feed, feed_bytes);
+-    Xil_DCacheInvalidateRange((UINTPTR)result_words, result_bytes);
++    Xil_DCacheFlushRange((UINTPTR)result_words, result_bytes);
+ 
+     int st=XAxiDma_SimpleTransfer(dma,(UINTPTR)result_words,result_bytes,XAXIDMA_DEVICE_TO_DMA);
+-    if(st!=XST_SUCCESS) return -3;
++    if(st!=XST_SUCCESS) return npu_cancel_dma(dma, -3);
+     st=XAxiDma_SimpleTransfer(dma,(UINTPTR)feed,feed_bytes,XAXIDMA_DMA_TO_DEVICE);
+-    if(st!=XST_SUCCESS) return -4;
++    if(st!=XST_SUCCESS) return npu_cancel_dma(dma, -4);
+ 
+     npu_wr(REG_CTRL, 1u); /* mode=0, START=1 */
+ 
+     st=npu_wait_done();
++    if (st) return npu_cancel_dma(dma, st);
++    uint32_t polls;
++    for (polls=0; polls<NPU_POLL_LIMIT; ++polls) {
++        if (!XAxiDma_Busy(dma, XAXIDMA_DMA_TO_DEVICE) &&
++            !XAxiDma_Busy(dma, XAXIDMA_DEVICE_TO_DMA)) break;
++    }
++    if (polls == NPU_POLL_LIMIT) return npu_cancel_dma(dma, -5);
+     Xil_DCacheInvalidateRange((UINTPTR)result_words,result_bytes);
+     return st;
+ }
+--- previous/sw/onnx_to_snpu.py
++++ review20/sw/onnx_to_snpu.py
+@@ -31,8 +31,17 @@
+     for a in node.attribute:
+         if a.type == 1: out[a.name]=a.f
+         elif a.type == 2: out[a.name]=a.i
++        elif a.type == 3: out[a.name]=a.s.decode("utf-8")
+         elif a.type == 7: out[a.name]=list(a.ints)
+     return out
++
++def check_spatial_attrs(op,a):
++    if a.get("auto_pad","NOTSET") not in ("NOTSET", ""):
++        raise SystemExit(f"{op} auto_pad is unsupported; supply explicit symmetric pads")
++    if a.get("dilations",[1,1]) != [1,1]:
++        raise SystemExit(f"{op} dilation is unsupported")
++    if op=="MaxPool" and (a.get("ceil_mode",0) or a.get("storage_order",0)):
++        raise SystemExit("MaxPool ceil_mode/storage_order is unsupported")
+ 
+ def flatten(x): return x.reshape(-1).tolist()
+ 
+@@ -87,6 +96,8 @@
+                 raise SystemExit("Add with constant initializer is not automatically lowered; fuse/quantize it explicitly")
+             layers.append({"type":"add"})
+         elif op=="MaxPool":
++            check_spatial_attrs(op,a)
++            if len(node.output)>1: raise SystemExit("MaxPool indices output is unsupported")
+             k=a.get("kernel_shape",[2,2]); s=a.get("strides",[2,2]); pads=a.get("pads",[0,0,0,0])
+             if k != [2,2] or s != [2,2] or pads != [0,0,0,0]:
+                 raise SystemExit("Only MaxPool 2x2 stride2 without padding supported in hardware mode")
+@@ -109,12 +120,15 @@
+             K,N=map(int,W.shape)
+             if Kin!=K: raise SystemExit(f"Gemm K mismatch: activation K={Kin}, weight K={K}")
+             bias=[0]*N
++            if len(node.input)>2 and node.input[2] and node.input[2] not in init:
++                raise SystemExit("Gemm requires constant bias when provided")
+             if len(node.input)>2 and node.input[2] in init:
+                 b=as_i32_exact(init[node.input[2]],np,label+" bias").reshape(-1)
+                 if b.size!=N: raise SystemExit(f"Gemm bias length {b.size} != N {N}")
+                 bias=flatten(b)
+             layers.append({"type":"matmul","M":M,"N":N,"K":K,"weights":flatten(W),"bias":bias})
+         elif op=="Conv":
++            check_spatial_attrs(op,a)
+             if len(node.input)<2 or node.input[1] not in init: raise SystemExit("Conv requires constant weights")
+             n,Cin,H,Wid=static_shape(shapes,node.input[0],4,"Conv")
+             if n!=1: raise SystemExit("SNPU Conv converter currently requires batch size 1")
+@@ -128,6 +142,8 @@
+                 raise SystemExit("Only symmetric equal H/W stride/padding supported")
+             W2=np.transpose(W,(0,2,3,1)).astype(np.int8,copy=False)
+             bias=[0]*O
++            if len(node.input)>2 and node.input[2] and node.input[2] not in init:
++                raise SystemExit("Conv requires constant bias when provided")
+             if len(node.input)>2 and node.input[2] in init:
+                 b=as_i32_exact(init[node.input[2]],np,label+" bias").reshape(-1)
+                 if b.size!=O: raise SystemExit(f"Conv bias length {b.size} != output channels {O}")
+--- previous/sw/pack_conv_stream.py
++++ review20/sw/pack_conv_stream.py
+@@ -1,19 +1,22 @@
+ #!/usr/bin/env python3
++from operator import index as integer
++
+ import argparse, json, struct
+ 
+ def i8(v,label="value"):
+-    v=int(v)
++    v=integer(v)
+     if v < -128 or v > 127:
+         raise ValueError(f"{label}={v} is outside signed INT8 range")
+     return v & 0xff
+ 
+ def i32(v,label="value"):
+-    v=int(v)
++    v=integer(v)
+     if v < -(1<<31) or v > (1<<31)-1:
+         raise ValueError(f"{label}={v} is outside signed INT32 range")
+     return v
+ 
+ def pack_conv_nhwc(inp, weights, stride=1, pad=0, groups=1, bias=None):
++    stride=integer(stride); pad=integer(pad); groups=integer(groups)
+     if not inp or not inp[0] or not inp[0][0]: raise ValueError('input must be non-empty NHWC')
+     H=len(inp); W=len(inp[0]); Cin=len(inp[0][0])
+     if any(len(row)!=W for row in inp): raise ValueError('ragged input height/width')
+--- previous/sw/pack_matmul_stream.py
++++ review20/sw/pack_matmul_stream.py
+@@ -1,14 +1,16 @@
+ #!/usr/bin/env python3
++from operator import index as integer
++
+ import argparse, struct, json
+ 
+ def require_i8(x,label="value"):
+-    x=int(x)
++    x=integer(x)
+     if x < -128 or x > 127:
+         raise ValueError(f"{label}={x} is outside signed INT8 range")
+     return x
+ 
+ def require_i32(x,label="value"):
+-    x=int(x)
++    x=integer(x)
+     if x < -(1<<31) or x > (1<<31)-1:
+         raise ValueError(f"{label}={x} is outside signed INT32 range")
+     return x
+@@ -17,6 +19,7 @@
+     return struct.pack("b", require_i8(x,label))
+ 
+ def make_feed(A, B, tile=8, bias=None):
++    tile=integer(tile)
+     if tile <= 0:
+         raise ValueError("tile must be positive")
+     if bias is not None and tile != 8:
+--- previous/sw/snpu_inspect.py
++++ review20/sw/snpu_inspect.py
+@@ -10,10 +10,12 @@
+     return st.unpack_from(data,off),off+st.size
+ 
+ def inspect(path):
+-    data=open(path,'rb').read()
++    with open(path,'rb') as f:
++        data=f.read()
+     if len(data)<8 or data[:4]!=MAGIC: raise ValueError('bad SNPU magic/truncated header')
+     (ver,nlayers),off=take(data,4,'<HH')
+     if ver!=VERSION: raise ValueError(f'unsupported SNPU version {ver}')
++    if not nlayers: raise ValueError('model must contain at least one layer')
+     layers=[]
+     for idx in range(nlayers):
+         (op,),off=take(data,off,'<B')
+@@ -23,6 +25,7 @@
+             off+=nw; (nb,),off=take(data,off,'<I')
+             if off+4*nb>len(data): raise ValueError(f'layer {idx}: truncated MatMul bias')
+             off+=4*nb
++            if not (M and N and K): raise ValueError(f'layer {idx}: zero MatMul dimension')
+             if nw!=K*N or nb!=N: raise ValueError(f'layer {idx}: invalid MatMul counts weights={nw}/{K*N} bias={nb}/{N}')
+             layers.append({'type':'matmul','M':M,'N':N,'K':K,'weights':nw,'bias':nb})
+         elif op==2:
+@@ -32,6 +35,8 @@
+             off+=nw; (nb,),off=take(data,off,'<I')
+             if off+4*nb>len(data): raise ValueError(f'layer {idx}: truncated Conv bias')
+             off+=4*nb
++            if not (H and W and C and O and Kh and Kw and S): raise ValueError(f'layer {idx}: zero Conv dimension/kernel/stride')
++            if H+2*P<Kh or W+2*P<Kw: raise ValueError(f'layer {idx}: Conv kernel exceeds padded input')
+             if not G or C%G or O%G: raise ValueError(f'layer {idx}: invalid Conv groups')
+             need=O*Kh*Kw*(C//G)
+             if nw!=need or nb!=O: raise ValueError(f'layer {idx}: invalid Conv counts weights={nw}/{need} bias={nb}/{O}')
+--- previous/scripts/build_ebaz4205_final.sh
++++ review20/scripts/build_ebaz4205_final.sh
+@@ -22,10 +22,10 @@
+ fi
+ 
+ if [[ "$RUN_XSIM" == "1" ]]; then
+-  echo "=== 51-TEST XSIM + CORE SYNTHESIS ==="
++  echo "=== 52-TEST XSIM + CORE SYNTHESIS ==="
+   "$VIVADO" -mode batch -source scripts/run_vivado_verification.tcl | tee full_verify.log
+-  grep -q 'SIM SUMMARY: PASS=51 FAIL=0' full_verify.log || {
+-    echo "ERROR: strict 51/51 XSim gate not observed" >&2; exit 4;
++  grep -q 'SIM SUMMARY: PASS=52 FAIL=0' full_verify.log || {
++    echo "ERROR: strict 52/52 XSim gate not observed" >&2; exit 4;
+   }
+ fi
+ 
+--- previous/scripts/final_release_audit.py
++++ review20/scripts/final_release_audit.py
+@@ -28,7 +28,7 @@
+ ck('NPU IRQ wired into PS concat','CONFIG.NUM_PORTS {3}' in bd and 'npu_0/irq' in bd)
+ 
+ vt=(ROOT/'scripts/run_vivado_verification.tcl').read_text(); tbs=list((ROOT/'sim').glob('tb_*.v'))+list((ROOT/'verification/extra').glob('*.v')); listed=set(re.findall(r'^\s+(tb_[A-Za-z0-9_]+)\s*$',vt,re.M))
+-ck('51-test Vivado suite',len(tbs)==51 and listed=={('tb_'+p.stem if p.stem.startswith('case_') else p.stem) for p in tbs},f'files={len(tbs)} listed={len(listed)}')
++ck('52-test Vivado suite',len(tbs)==52 and listed=={('tb_'+p.stem if p.stem.startswith('case_') else p.stem) for p in tbs},f'files={len(tbs)} listed={len(listed)}')
+ ck('new tests have PASS/FAIL',all('PASS' in p.read_text() and 'FAIL' in p.read_text() for p in tbs))
+ 
+ # Compile every Python file in-process. This checks syntax without creating
+--- previous/scripts/five_more_pass_audit.py
++++ review20/scripts/five_more_pass_audit.py
+@@ -118,7 +118,7 @@
+ tb_files=list((root/'sim').glob('tb_*.v'))+list((root/'verification/extra').glob('*.v'))
+ listed=re.findall(r'(?m)^\s*(tb_[A-Za-z0-9_]+)\s*$',tcl)
+ add((root/'sim/tb_matmul_multitile_order.v').exists() and 'tb_matmul_multitile_order' in listed,'P3 multi-tile hardware-order regression is in XSim suite')
+-add(len(tb_files)==51 and len(set(listed))==51 and set(listed)=={('tb_'+p.stem if p.stem.startswith('case_') else p.stem) for p in tb_files},'P3 strict Vivado suite is exactly 51 existing tests',f'files={len(tb_files)} listed={len(set(listed))}')
++add(len(tb_files)==52 and len(set(listed))==52 and set(listed)=={('tb_'+p.stem if p.stem.startswith('case_') else p.stem) for p in tb_files},'P3 strict Vivado suite is exactly 52 existing tests',f'files={len(tb_files)} listed={len(set(listed))}')
+ add('regexp -line {^FAIL}' in tcl and 'regexp -line {^PASS}' in tcl and 'testbench emitted FAIL' in tcl,'P3 XSim Tcl checks logical PASS/FAIL, not process exit only')
+ 
+ # ---------- Pass 4: software/RTL contract safety ----------
+@@ -158,7 +158,7 @@
+     try: compile(p.read_text(),str(p),'exec')
+     except Exception as e: ok=False; bad.append(f'{p.name}:{e}')
+ add(ok,'P5 all Python sources parse', '; '.join(bad[:3]))
+-add('SIM SUMMARY: PASS=51 FAIL=0' in final and 'RUN_IMPL=1' in final,'P5 canonical build gates 51/51 before implementation')
++add('SIM SUMMARY: PASS=52 FAIL=0' in final and 'RUN_IMPL=1' in final,'P5 canonical build gates 52/52 before implementation')
+ 
+ fails=[x for x in checks if not x[0]]
+ print(f"SECOND_FIVE_PASS_AUDIT {'PASS' if not fails else 'FAIL'}: {len(checks)-len(fails)}/{len(checks)} checks")
+--- previous/scripts/run_vivado_verification.tcl
++++ review20/scripts/run_vivado_verification.tcl
+@@ -95,6 +95,7 @@
+     tb_case_8_1
+     tb_case_9_0
+     tb_case_9_1
++    tb_conv_final_fence
+     tb_control_wstrb
+     tb_dma_continuous
+     tb_postprocess_pipe_equivalence
+--- previous/scripts/third_five_pass_audit.py
++++ review20/scripts/third_five_pass_audit.py
+@@ -78,7 +78,7 @@
+ add('create_clock -period 10.000 -name aclk' in vt,'P5 core synthesis has real 100 MHz timing constraint')
+ add('get_timing_paths' in build and 'Final implementation fails setup timing' in build and 'Final implementation fails hold timing' in build,'P5 full implementation hard-fails negative setup/hold slack')
+ add('preset.xml' in fetch and 'presets.xml' not in fetch,'P5 EBAZ board-support filename matches actual repository')
+-add('SIM SUMMARY: PASS=51 FAIL=0' in final and 'RUN_SYNTH=1 RUN_IMPL=1' in final,'P5 canonical build gates XSim before full implementation')
++add('SIM SUMMARY: PASS=52 FAIL=0' in final and 'RUN_SYNTH=1 RUN_IMPL=1' in final,'P5 canonical build gates XSim before full implementation')
+ 
+ fails=[x for x in checks if not x[0]]
+ print(f"THIRD_FIVE_PASS_AUDIT {'PASS' if not fails else 'FAIL'}: {len(checks)-len(fails)}/{len(checks)} checks")
+--- previous/scripts/validate_release.sh
++++ review20/scripts/validate_release.sh
+@@ -72,4 +72,7 @@
+   echo "kernel headers unavailable: module compile skipped"
+ fi
+ 
++python3 verification/review20/test_software.py -v
++python3 verification/review20/test_baremetal.py
++
+ echo "FINAL RELEASE STATIC VALIDATION PASS"
+--- previous/verification/extra/tb_conv_final_fence.v
++++ review20/verification/extra/tb_conv_final_fence.v
+@@ -0,0 +1,27 @@
++`timescale 1ns/1ps
++module tb_conv_final_fence;
++reg clk=0,rst=1,start=0,sv=0,lasts=0,joblast=0,outready=0;
++reg signed [7:0] a=2,w=3;wire sr;wire signed [7:0] out;wire ov,ol,busy,done;
++conv_stream_job_engine dut(.clk(clk),.rst(rst),.start(start),.sample_valid(sv),.activation(a),.weight(w),
++.last_sample(lasts),.job_last(joblast),.sample_bias(32'sd0),.relu_en(1'b0),.qmul(32'sd1),.qshift(6'd0),.zero_point(8'sd0),
++.sample_ready(sr),.out_data(out),.out_valid(ov),.out_ready(outready),.out_last(ol),.busy(busy),.done(done));
++always #5 clk=~clk;
++integer i;
++initial begin
++ #12;rst=0;@(negedge clk);start=1;@(negedge clk);start=0;
++ sv=1;lasts=1;joblast=1;while(!sr)@(negedge clk);
++ @(negedge clk);lasts=0;joblast=0; // Keep a following sample valid continuously.
++ for(i=0;i<24;i=i+1)begin
++  if(sr)begin $display("FAIL Conv accepted data beyond final sample");$finish;end
++  @(negedge clk);
++ end
++ if(!ov || !ol || out!==8'sd6 || !busy)begin $display("FAIL final output stalled");$finish;end
++ outready=1;@(negedge clk);#1;
++ if(!done || busy || sr)begin $display("FAIL final completion");$finish;end
++ sv=0;start=1;@(negedge clk);start=0;sv=1;lasts=1;joblast=1;a=-2;w=4;
++ while(!sr)@(negedge clk);@(negedge clk);sv=0;
++ wait(ov);#1;if(out!==-8'sd8 || !ol)begin $display("FAIL restart");$finish;end
++ wait(done);$display("PASS Conv final fence and restart");$finish;
++end
++initial begin #10000;$display("FAIL timeout");$finish;end
++endmodule
+--- previous/verification/review20/run_exhaustive.py
++++ review20/verification/review20/run_exhaustive.py
+@@ -0,0 +1,13 @@
++#!/usr/bin/env python3
++"""Extra long-running HDL regression, outside the finite 200us XSim suite."""
++import os, pathlib, subprocess, tempfile
++root=pathlib.Path(__file__).resolve().parents[2]
++flags=['-B',os.environ['IVERILOG_BASE']] if os.environ.get('IVERILOG_BASE') else []
++with tempfile.TemporaryDirectory() as t:
++    exe=str(pathlib.Path(t)/'add.vvp')
++    subprocess.run([os.environ.get('IVERILOG','iverilog'),*flags,'-g2005','-s','tb_add_exhaustive','-o',exe,
++                    *map(str,sorted((root/'rtl').glob('*.v'))),str(root/'verification/review20/tb_add_exhaustive.v')],check=True)
++    run=subprocess.run([os.environ.get('VVP','vvp'),exe],capture_output=True,text=True,timeout=30,check=True)
++    print(run.stdout,end='')
++    if 'PASS exhaustive Add: 131072' not in run.stdout or 'FAIL' in run.stdout:
++        raise SystemExit(1)
+--- previous/verification/review20/tb_add_exhaustive.v
++++ review20/verification/review20/tb_add_exhaustive.v
+@@ -0,0 +1,26 @@
++`timescale 1ns/1ps
++module tb_add_exhaustive;
++reg clk=0,rst=1,start=0,sv=0,sl=0,ready=0,relu=0;
++reg [127:0] data=0;wire sr;wire signed [7:0] out;wire ov,ol,busy,done;
++integer a,b,r,expected,count=0,cycles=0;
++axis_elementwise_add_engine dut(.clk(clk),.rst(rst),.start(start),.relu_en(relu),.s_axis_tdata(data),.s_axis_tvalid(sv),.s_axis_tlast(sl),.s_axis_tready(sr),.out_data(out),.out_valid(ov),.out_ready(ready),.out_last(ol),.busy(busy),.done(done));
++always #5 clk=~clk;
++always @(negedge clk)begin cycles=cycles+1;ready=(cycles%7!=0 && cycles%7!=1);end
++initial begin
++ #12;rst=0;
++ for(r=0;r<2;r=r+1)begin
++  @(negedge clk);relu=r;start=1;@(negedge clk);start=0;
++  for(a=-128;a<128;a=a+1)for(b=-128;b<128;b=b+1)begin
++   @(negedge clk);while(!sr)@(negedge clk);
++   data={112'd0,b[7:0],a[7:0]};sv=1;sl=(a==127&&b==127);
++   @(posedge clk);#1;expected=a+b;
++   if(r&&expected<0)expected=0;if(expected>127)expected=127;if(expected< -128)expected=-128;
++   if(!ov || $signed(out)!==expected || ol!==sl)begin $display("FAIL Add a=%0d b=%0d relu=%0d got=%0d expected=%0d",a,b,r,out,expected);$finish;end
++   count=count+1;@(negedge clk);sv=0;
++  end
++  wait(done);@(negedge clk);
++ end
++ $display("PASS exhaustive Add: %0d signed pairs including ReLU and stalls",count);$finish;
++end
++initial begin #10000000;$display("FAIL timeout");$finish;end
++endmodule
+--- previous/verification/review20/test_baremetal.py
++++ review20/verification/review20/test_baremetal.py
+@@ -0,0 +1,43 @@
++#!/usr/bin/env python3
++"""Host mocks check sequencing/recovery; not an actual Xilinx BSP build."""
++from pathlib import Path
++import tempfile,subprocess
++root=Path(__file__).resolve().parents[2]
++headers={
++'xparameters.h':'#define XPAR_NPU_AXIS_SYSTEM_TOP_0_S_AXI_BASEADDR 0\n',
++'xil_io.h':'#include <stdint.h>\ntypedef uintptr_t UINTPTR;\nvoid Xil_Out32(UINTPTR,uint32_t);\nuint32_t Xil_In32(UINTPTR);\n',
++'xil_cache.h':'void Xil_DCacheFlushRange(UINTPTR,uint32_t);\nvoid Xil_DCacheInvalidateRange(UINTPTR,uint32_t);\n',
++'xaxidma.h':'typedef struct { int unused; } XAxiDma;\n#define XST_SUCCESS 0\n#define XAXIDMA_DEVICE_TO_DMA 1\n#define XAXIDMA_DMA_TO_DEVICE 0\nint XAxiDma_SimpleTransfer(XAxiDma*,UINTPTR,uint32_t,int);\nint XAxiDma_Busy(XAxiDma*,int);\nvoid XAxiDma_Reset(XAxiDma*);\nint XAxiDma_ResetIsDone(XAxiDma*);\n'}
++code=r'''
++#include <assert.h>
++#include "SOURCE"
++static int scenario,started,reset_count,polls,invalidated,submitted;
++void Xil_Out32(UINTPTR a,uint32_t v){if(a==REG_CTRL && v==1)started=1;}
++uint32_t Xil_In32(UINTPTR a){return a==REG_CTRL && started ? (scenario==3?0:2):0;}
++void Xil_DCacheFlushRange(UINTPTR a,uint32_t n){(void)a;(void)n;}
++void Xil_DCacheInvalidateRange(UINTPTR a,uint32_t n){(void)a;(void)n;assert(polls>=3);invalidated++;}
++int XAxiDma_SimpleTransfer(XAxiDma*d,UINTPTR a,uint32_t n,int dir){(void)d;(void)a;(void)n;assert(dir==(submitted==0?1:0));submitted++;return (scenario==1&&dir==1)||(scenario==2&&dir==0);}
++int XAxiDma_Busy(XAxiDma*d,int dir){(void)d;(void)dir;if(!started)return 0;polls++;return scenario==4||polls<3;}
++void XAxiDma_Reset(XAxiDma*d){(void)d;reset_count++;}
++int XAxiDma_ResetIsDone(XAxiDma*d){(void)d;return scenario!=5;}
++int main(void){
++ XAxiDma dma;uint8_t feed[128]={0};uint32_t result[1];
++ for(scenario=0;scenario<=5;scenario++){
++  started=reset_count=polls=invalidated=submitted=0;
++  int rc=run_matmul(&dma,feed,128,result,4,1,1,1);
++  if(scenario==0||scenario==5){assert(rc==0);assert(invalidated==1);assert(reset_count==0);}
++  else {assert(rc<0);assert(reset_count==1);assert(invalidated==0);}
++ }
++ scenario=5;started=reset_count=polls=invalidated=submitted=0;
++ /* A stuck reset is reported separately. */
++ assert(npu_cancel_dma(&dma,-1)==-6);
++ assert(run_matmul(&dma,feed,16,result,4,1,1,1)==-7);
++ puts("PASS baremetal DMA completion, submit failures, NPU/DMA timeouts, reset failure, buffer size");return 0;
++}
++'''
++with tempfile.TemporaryDirectory() as t:
++ p=Path(t)
++ for name,body in headers.items():(p/name).write_text(body)
++ (p/'test.c').write_text(code.replace('SOURCE',str(root/'sw/npu_baremetal_example.c')))
++ subprocess.run(['gcc','-std=c11','-Wall','-Wextra','-Werror','-DNPU_POLL_LIMIT=16','-I',str(p),str(p/'test.c'),'-o',str(p/'test')],check=True)
++ subprocess.run([str(p/'test')],check=True)
+--- previous/verification/review20/test_software.py
++++ review20/verification/review20/test_software.py
+@@ -0,0 +1,67 @@
++#!/usr/bin/env python3
++"""Behavioral checks for malformed models, numeric fidelity and TCP framing."""
++import importlib.util, pathlib, struct, tempfile, unittest, sys
++ROOT=pathlib.Path(sys.argv.pop(1)).resolve() if len(sys.argv)>1 and not sys.argv[1].startswith('-') else pathlib.Path(__file__).resolve().parents[2]
++def load(name,path):
++ s=importlib.util.spec_from_file_location(name,ROOT/path);m=importlib.util.module_from_spec(s);s.loader.exec_module(m);return m
++model=load('model','sw/model_packer.py'); inspect=load('inspect_snpu','sw/snpu_inspect.py')
++mm=load('mm','sw/pack_matmul_stream.py'); cv=load('cv','sw/pack_conv_stream.py'); net=load('net','sw/host/npu_net_client.py')
++onnx=load('onnx_converter','sw/onnx_to_snpu.py')
++class Socket:
++ def __init__(self,blob):self.blob=blob;self.closed=False
++ def recv(self,n):out=self.blob[:min(n,3)];self.blob=self.blob[len(out):];return out
++ def sendall(self,b):pass
++ def close(self):self.closed=True
++class Tests(unittest.TestCase):
++ def reject(self,fn,*args):
++  with self.assertRaises((ValueError,TypeError,OverflowError)):fn(*args)
++ def inspect_blob(self,b):
++  with tempfile.NamedTemporaryFile() as f:f.write(b);f.flush();return inspect.inspect(f.name)
++ def test_onnx_spatial_attributes(self):
++  for op in ["Conv","MaxPool"]:
++   onnx.check_spatial_attrs(op,{})
++   for attrs in [{"auto_pad":"SAME_UPPER"},{"auto_pad":"VALID"},{"dilations":[2,1]}]:
++    with self.assertRaises(SystemExit):onnx.check_spatial_attrs(op,attrs)
++  for attrs in [{"ceil_mode":1},{"storage_order":1}]:
++   with self.assertRaises(SystemExit):onnx.check_spatial_attrs("MaxPool",attrs)
++ def test_integer_fidelity(self):
++  for bad in [1.5,-1.5,float('nan'),float('inf')]:
++   for fn in [mm.require_i8,mm.require_i32,cv.i8,cv.i32,net.as_i8,net.as_i32]:
++    with self.subTest(fn=fn.__name__,bad=bad):self.reject(fn,bad)
++   self.reject(model.as_i8,[bad],'w');self.reject(model.as_i32,[bad],'b');self.reject(model.require_u16,bad,'M')
++ def test_integer_boundaries(self):
++  for fn in [mm.require_i8,net.as_i8]:
++   self.assertEqual(fn(-128),-128);self.assertEqual(fn(127),127);self.reject(fn,-129);self.reject(fn,128)
++  for fn in [mm.require_i32,cv.i32,net.as_i32]:
++   self.assertEqual(fn(-(1<<31)),-(1<<31));self.assertEqual(fn((1<<31)-1),(1<<31)-1);self.reject(fn,1<<31)
++ def test_stream_packers_agree(self):
++  for M,N,K in [(1,9,1),(9,1,2),(9,9,8),(3,17,5),(17,3,8)]:
++   A=[[(r+k)%9-4 for k in range(K)] for r in range(M)];B=[[(k+c)%7-3 for c in range(N)] for k in range(K)]
++   for bias in [None,list(range(N))]:
++    self.assertEqual(mm.make_feed(A,B,bias=bias),net.pack_matmul(A,B,bias=bias)[0])
++ def test_empty_model(self):self.reject(self.inspect_blob,b'SNPU'+struct.pack('<HH',2,0))
++ def test_zero_matmul(self):self.reject(self.inspect_blob,b'SNPU'+struct.pack('<HHBHHHII',2,1,1,0,0,0,0,0))
++ def test_conv_geometry(self):
++  for dims in [(0,1,1,1,1,1,1,1,0),(1,1,1,1,1,1,1,0,0),(1,1,1,1,1,2,2,1,0)]:
++   nw=dims[3]*dims[5]*dims[6];b=b'SNPU'+struct.pack('<HHBHHHHHBBBBI',2,1,2,*dims,nw)+bytes(nw)+struct.pack('<Ii',1,0)
++   self.reject(self.inspect_blob,b)
++ def test_valid_model_truncation(self):
++  with tempfile.TemporaryDirectory() as t:
++   p=pathlib.Path(t)/'x.snpu';model.pack_model({'layers':[{'type':'matmul','M':1,'N':1,'K':1,'weights':[-128],'bias':[2147483647]}]},p)
++   b=p.read_bytes();self.assertEqual(inspect.inspect(p)['layers'][0]['bias'],1)
++   for i in range(len(b)):self.reject(self.inspect_blob,b[:i])
++   self.reject(self.inspect_blob,b+b'!')
++ def test_reply_size(self):
++  for op,size in [(net.OP_INFO,28),(net.OP_ADD,4)]:
++   for n in [0,size+1,0xffffffff]:
++    sock=Socket(net.REP.pack(b'SNPR',1,0,n));s=net.NpuSession('unused');s.sock=sock
++    with self.assertRaisesRegex(RuntimeError,'unexpected reply size'):s.request(op,out_bytes=4)
++    self.assertTrue(sock.closed)
++ def test_fragmented_reply(self):
++  sock=Socket(net.REP.pack(b'SNPR',1,0,4)+b'1234');s=net.NpuSession('unused');s.sock=sock;self.assertEqual(s.request(net.OP_ADD,out_bytes=4),b'1234')
++ def test_bad_header_and_disconnect(self):
++  for b in [net.REP.pack(b'WRNG',1,0,4),net.REP.pack(b'SNPR',2,0,4),net.REP.pack(b'SNPR',1,-1,0),b'']:
++   sock=Socket(b);s=net.NpuSession('unused');s.sock=sock
++   with self.assertRaises((RuntimeError,ConnectionError)):s.request(net.OP_ADD,out_bytes=4)
++   self.assertTrue(sock.closed)
++if __name__=='__main__':unittest.main()

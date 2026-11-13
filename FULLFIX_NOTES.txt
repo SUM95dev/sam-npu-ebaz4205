@@ -1,0 +1,15 @@
+Sam NPU EBAZ4205 15PASS FULLFIX
+
+Integrated fixes in this complete source tree:
+- corrected 5 testbenches reported by the latest real XSim run:
+  tb_controller_flush_cycles
+  tb_regs_sticky_done
+  tb_regs_invalid_start
+  tb_axi_lite_read_write
+  tb_matmul_bias_feeder
+- verification flow stops immediately when any behavioral test fails; synthesis does not start after a failing suite
+- legacy fifty-pass audit is portable: selects gcc, then clang, then cc instead of hard-coding clang
+- XSim finite runtime and low-memory defaults retained
+- no Python __pycache__/pyc files are shipped
+
+Important: this package has not been re-run through Vivado in this environment. On Sam's machine, the next hard gate is a fresh 28/28 XSim run, followed by synthesis/timing/implementation.

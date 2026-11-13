@@ -1,0 +1,13 @@
+/*
+ * NPU AXI-Lite aperture.  Do NOT replace /chosen/bootargs from a fragment:
+ * preserve the board's console/root arguments and append
+ *   uio_pdrv_genirq.of_id=generic-uio
+ * to the existing kernel command line (or module parameter) when required by
+ * your kernel configuration.
+ */
+/ {
+    npu0: npu@43c00000 {
+        compatible = "generic-uio";
+        reg = <0x43c00000 0x10000>;
+    };
+};

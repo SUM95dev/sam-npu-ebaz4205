@@ -1,0 +1,26 @@
+{
+  "added_now": [
+    "Vivado behavioral simulation + synthesis audit script",
+    "bitstream/XSA script gated on a valid PS7 block design",
+    "hardware self-test vector generator",
+    "performance estimator",
+    "limited ONNX importer for MatMul/Gemm/Conv/Relu/MaxPool",
+    "Linux DMAengine proxy driver + mmap/ioctl test utility",
+    "known-good EBAZ4205 Vivado 2020.2 reference documentation"
+  ],
+  "python_compile_status": {
+    "generate_selftest_vectors.py": 0,
+    "perf_estimator.py": 0,
+    "onnx_to_snpu.py": 0,
+    "selftest_generator": 0
+  },
+  "static_rtl_issues": [],
+  "cannot_be_completed_without_external_environment": [
+    "Actual xsim results",
+    "Actual synthesis utilization",
+    "Actual timing closure",
+    "Actual EBAZ4205 bitstream",
+    "Actual hardware validation",
+    "ONNX converter execution until optional onnx/numpy are installed"
+  ]
+}

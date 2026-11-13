@@ -1,0 +1,332 @@
+[
+  {
+    "test": "sim/tb_axi_lite_read_write.v",
+    "passed": true,
+    "output": "PASS AXI-Lite read/write sequencing\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_axi_lite_read_write.v:61: $finish called at 150000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_axis_add.v",
+    "passed": true,
+    "output": "PASS axis elementwise add\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_axis_add.v:15: $finish called at 76000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_axis_maxpool.v",
+    "passed": true,
+    "output": "PASS axis maxpool2x2\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_axis_maxpool.v:15: $finish called at 136000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_axis_tile_output_backpressure.v",
+    "passed": true,
+    "output": "PASS axis tile backpressure\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_axis_tile_output_backpressure.v:22: $finish called at 155000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_controller_flush_cycles.v",
+    "passed": true,
+    "output": "PASS flush counts N2=1 N8=7\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_flush_cycles.v:28: $finish called at 246000 (1ps)\n",
+    "compiler_stderr": "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_flush_cycles.v:9: warning: Port 4 (M) of matmul_controller expects 16 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_flush_cycles.v:9:        : Pruning (signed) 16 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_flush_cycles.v:9: warning: Port 5 (Ndim) of matmul_controller expects 16 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_flush_cycles.v:9:        : Pruning (signed) 16 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_flush_cycles.v:9: warning: Port 6 (K) of matmul_controller expects 16 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_flush_cycles.v:9:        : Pruning (signed) 16 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_flush_cycles.v:12: warning: Port 4 (M) of matmul_controller expects 16 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_flush_cycles.v:12:        : Pruning (signed) 16 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_flush_cycles.v:12: warning: Port 5 (Ndim) of matmul_controller expects 16 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_flush_cycles.v:12:        : Pruning (signed) 16 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_flush_cycles.v:12: warning: Port 6 (K) of matmul_controller expects 16 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_flush_cycles.v:12:        : Pruning (signed) 16 high bits of the expression.\n"
+  },
+  {
+    "test": "sim/tb_controller_unsolicited_valid.v",
+    "passed": true,
+    "output": "PASS unsolicited-valid handshake\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_controller_unsolicited_valid.v:17: $finish called at 56000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_conv_config_latch.v",
+    "passed": true,
+    "output": "PASS CONV CONFIG LATCH\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_config_latch.v:26: $finish called at 106000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_conv_scheduler_invalid_geometry.v",
+    "passed": true,
+    "output": "PASS invalid geometry rejected\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:11: $finish called at 55000 (1ps)\n",
+    "compiler_stderr": "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4: warning: Port 4 (in_h) of conv2d_scheduler expects 16 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4:        : Pruning (signed) 16 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4: warning: Port 5 (in_w) of conv2d_scheduler expects 16 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4:        : Pruning (signed) 16 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4: warning: Port 6 (in_c) of conv2d_scheduler expects 16 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4:        : Pruning (signed) 16 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4: warning: Port 7 (out_c) of conv2d_scheduler expects 16 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4:        : Pruning (signed) 16 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4: warning: Port 8 (k_h) of conv2d_scheduler expects 8 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4:        : Pruning (signed) 24 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4: warning: Port 9 (k_w) of conv2d_scheduler expects 8 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4:        : Pruning (signed) 24 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4: warning: Port 10 (stride_h) of conv2d_scheduler expects 8 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4:        : Pruning (signed) 24 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4: warning: Port 11 (stride_w) of conv2d_scheduler expects 8 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4:        : Pruning (signed) 24 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4: warning: Port 12 (pad_h) of conv2d_scheduler expects 8 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4:        : Pruning (signed) 24 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4: warning: Port 13 (pad_w) of conv2d_scheduler expects 8 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4:        : Pruning (signed) 24 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4: warning: Port 14 (sample_accepted) of conv2d_scheduler expects 1 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_scheduler_invalid_geometry.v:4:        : Pruning (signed) 31 high bits of the expression.\n"
+  },
+  {
+    "test": "sim/tb_conv_stream.v",
+    "passed": true,
+    "output": "PASS CONV\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_stream.v:8: $finish called at 106000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_conv_stream_bias.v",
+    "passed": true,
+    "output": "PASS conv per-output bias\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_stream_bias.v:25: $finish called at 226000 (1ps)\n",
+    "compiler_stderr": "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_stream_bias.v:7: warning: Port 10 (relu_en) of conv_stream_job_engine expects 1 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_stream_bias.v:7:        : Pruning (signed) 31 high bits of the expression.\n"
+  },
+  {
+    "test": "sim/tb_conv_stream_job.v",
+    "passed": true,
+    "output": "PASS conv stream multi-output job\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_stream_job.v:21: $finish called at 266000 (1ps)\n",
+    "compiler_stderr": "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_stream_job.v:6: warning: Port 10 (relu_en) of conv_stream_job_engine expects 1 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_conv_stream_job.v:6:        : Pruning (signed) 31 high bits of the expression.\n"
+  },
+  {
+    "test": "sim/tb_matmul_bias_feeder.v",
+    "passed": true,
+    "output": "PASS matmul streamed bias feeder\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_matmul_bias_feeder.v:66: $finish called at 110000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_matmul_controller_stall.v",
+    "passed": true,
+    "output": "PASS controller stall handshake\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_matmul_controller_stall.v:30: $finish called at 135000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_matmul_engine_2x2.v",
+    "passed": true,
+    "output": "PASS ENGINE 2x2 with stall\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_matmul_engine_2x2.v:54: $finish called at 235000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_matmul_multitile_order.v",
+    "passed": true,
+    "output": "PASS MATMUL MULTITILE ORDER\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_matmul_multitile_order.v:63: $finish called at 786000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_matmul_output_backpressure.v",
+    "passed": true,
+    "output": "PASS matmul output backpressure\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_matmul_output_backpressure.v:22: $finish called at 166000 (1ps)\n",
+    "compiler_stderr": "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_matmul_output_backpressure.v:6: warning: Port 4 (M) of matmul_controller expects 16 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_matmul_output_backpressure.v:6:        : Pruning (signed) 16 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_matmul_output_backpressure.v:6: warning: Port 5 (Ndim) of matmul_controller expects 16 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_matmul_output_backpressure.v:6:        : Pruning (signed) 16 high bits of the expression.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_matmul_output_backpressure.v:6: warning: Port 6 (K) of matmul_controller expects 16 bits, got 32.\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_matmul_output_backpressure.v:6:        : Pruning (signed) 16 high bits of the expression.\n"
+  },
+  {
+    "test": "sim/tb_npu_pe.v",
+    "passed": true,
+    "output": "PASS PE\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_npu_pe.v:10: $finish called at 62000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_npu_top_2x2.v",
+    "passed": true,
+    "output": "PASS TOP 2x2\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_npu_top_2x2.v:65: $finish called at 326000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_partial_tile_mask.v",
+    "passed": true,
+    "output": "PASS partial mask\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_partial_tile_mask.v:14: $finish called at 215000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_pe_clear_pipeline.v",
+    "passed": true,
+    "output": "PASS clear pipeline\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_pe_clear_pipeline.v:11: $finish called at 51000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_postprocess_boundaries.v",
+    "passed": true,
+    "output": "PASS postprocess boundaries\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_postprocess_boundaries.v:30: $finish called at 5000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_regs_extended.v",
+    "passed": true,
+    "output": "PASS extended regs irq abort caps perf\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_regs_extended.v:33: $finish called at 252000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_regs_invalid_start.v",
+    "passed": true,
+    "output": "PASS invalid-start handling\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_regs_invalid_start.v:38: $finish called at 91000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_regs_start_lock.v",
+    "passed": true,
+    "output": "PASS start-pending config lock\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_regs_start_lock.v:28: $finish called at 96000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_regs_sticky_done.v",
+    "passed": true,
+    "output": "PASS sticky done\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_regs_sticky_done.v:32: $finish called at 81000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_system_done_after_stream.v",
+    "passed": true,
+    "output": "PASS system done after AXIS drain\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_system_done_after_stream.v:66: $finish called at 620000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_systolic_2x2.v",
+    "passed": true,
+    "output": "PASS SYS\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_systolic_2x2.v:11: $finish called at 82000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "sim/tb_tile_postprocess.v",
+    "passed": true,
+    "output": "PASS TILE POST\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sim/tb_tile_postprocess.v:25: $finish called at 126000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_0_0.v",
+    "passed": true,
+    "output": "PASS shape=1,9,1 bias=False\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_0_0.v:100: $finish called at 5290000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_0_1.v",
+    "passed": true,
+    "output": "PASS shape=1,9,1 bias=True\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_0_1.v:104: $finish called at 5330000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_1_0.v",
+    "passed": true,
+    "output": "PASS shape=9,1,1 bias=False\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_1_0.v:100: $finish called at 5290000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_1_1.v",
+    "passed": true,
+    "output": "PASS shape=9,1,1 bias=True\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_1_1.v:104: $finish called at 5330000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_2_0.v",
+    "passed": true,
+    "output": "PASS shape=9,9,2 bias=False\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_2_0.v:192: $finish called at 7750000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_2_1.v",
+    "passed": true,
+    "output": "PASS shape=9,9,2 bias=True\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_2_1.v:200: $finish called at 7790000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_3_0.v",
+    "passed": true,
+    "output": "PASS shape=3,17,5 bias=False\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_3_0.v:162: $finish called at 6320000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_3_1.v",
+    "passed": true,
+    "output": "PASS shape=3,17,5 bias=True\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_3_1.v:168: $finish called at 6380000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_4_0.v",
+    "passed": true,
+    "output": "PASS shape=17,3,8 bias=False\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_4_0.v:171: $finish called at 6410000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_4_1.v",
+    "passed": true,
+    "output": "PASS shape=17,3,8 bias=True\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_4_1.v:177: $finish called at 6470000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_5_0.v",
+    "passed": true,
+    "output": "PASS shape=8,8,1 bias=False\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_5_0.v:147: $finish called at 4380000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_5_1.v",
+    "passed": true,
+    "output": "PASS shape=8,8,1 bias=True\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_5_1.v:149: $finish called at 4400000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_6_0.v",
+    "passed": true,
+    "output": "PASS shape=1,1,1 bias=False\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_6_0.v:84: $finish called at 4380000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_6_1.v",
+    "passed": true,
+    "output": "PASS shape=1,1,1 bias=True\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_6_1.v:86: $finish called at 4400000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_7_0.v",
+    "passed": true,
+    "output": "PASS shape=8,16,4 bias=False\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_7_0.v:225: $finish called at 5350000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_7_1.v",
+    "passed": true,
+    "output": "PASS shape=8,16,4 bias=True\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_7_1.v:229: $finish called at 5390000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_8_0.v",
+    "passed": true,
+    "output": "PASS shape=16,16,16 bias=False\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_8_0.v:423: $finish called at 8600000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_8_1.v",
+    "passed": true,
+    "output": "PASS shape=16,16,16 bias=True\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_8_1.v:431: $finish called at 8650000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_9_0.v",
+    "passed": true,
+    "output": "PASS shape=9,17,3 bias=False\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_9_0.v:288: $finish called at 10200000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/case_9_1.v",
+    "passed": true,
+    "output": "PASS shape=9,17,3 bias=True\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/case_9_1.v:300: $finish called at 10280000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/tb_axi_lite_random_stalls.v",
+    "passed": true,
+    "output": "PASS AXI-Lite 300 random AW/W delays, WSTRB and stalled B/R responses\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/tb_axi_lite_random_stalls.v:36: $finish called at 63150000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/tb_control_wstrb.v",
+    "passed": true,
+    "output": "PASS CONTROL WSTRB\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/tb_control_wstrb.v:39: $finish called at 310000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/tb_conv_final_fence.v",
+    "passed": true,
+    "output": "PASS Conv final fence and restart\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/tb_conv_final_fence.v:24: $finish called at 395000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/tb_conv_memory_stall.v",
+    "passed": true,
+    "output": "PASS Conv memory first sample and output stall\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/tb_conv_memory_stall.v:31: $finish called at 556000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/tb_conv_memory_stall_c2.v",
+    "passed": true,
+    "output": "PASS Conv memory C2 multi-sample and output stall\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/tb_conv_memory_stall_c2.v:31: $finish called at 636000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/tb_dma_continuous.v",
+    "passed": true,
+    "output": "OUTPUT 0 data=6 last=0\nOUTPUT 1 data=8 last=0\nOUTPUT 2 data=10 last=1\nRESULT sent=4 outputs=3 busy=0 done=1\nPASS continuous DMA stream\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/tb_dma_continuous.v:76: $finish called at 2010000 (1ps)\n",
+    "compiler_stderr": ""
+  },
+  {
+    "test": "verification/extra/tb_postprocess_pipe_equivalence.v",
+    "passed": true,
+    "output": "PASS PIPE equivalent valid_samples=9230\n/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/extra/tb_postprocess_pipe_equivalence.v:39: $finish called at 100120000 (1ps)\n",
+    "compiler_stderr": ""
+  }
+]

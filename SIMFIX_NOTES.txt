@@ -1,0 +1,11 @@
+Sam NPU 15PASS simulation-fix patch
+
+Fixes five failures observed on real Vivado 2020.2 run:
+- tb_controller_flush_cycles: wait for independent one-cycle DONE pulses using sticky seen flags.
+- tb_regs_sticky_done: sample registered start_pulse after accepting rising edge.
+- tb_regs_invalid_start: same registered pulse timing correction.
+- tb_axi_lite_read_write: allow registered reg_wr observer/BREADY handshake to reach a rising edge before checking.
+- tb_matmul_bias_feeder: check bias leakage at synchronous clock sampling points rather than a delta-cycle continuous-assignment race.
+- run_vivado_verification.tcl now aborts before synthesis if any behavioral simulation fails, avoiding unnecessary RAM-heavy synthesis on low-memory machines.
+
+No production RTL was changed by this patch.

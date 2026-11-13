@@ -1,0 +1,2 @@
+packet bytes: {'mm': 176, 'add': 48, 'pool': 128, 'conv': 64, 'dw': 32}
+PASS dry-run packet/golden construction

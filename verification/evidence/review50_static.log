@@ -1,0 +1,218 @@
+[1/8] Five-pass baseline audit
+P1 PASS all textual source files readable/nonempty: 183 files; bad=[]
+P1 PASS no merge conflict markers: []
+P1 PASS named-port consistency: modules 29 instances 55 issues 0
+P1 PASS legacy 50-point audit still clean: RESULT 50 /50
+P2 PASS Conv memory geometry guarded: stride/kernel/padded-width guard
+P2 PASS Conv memory rejects unsolicited responses: responses tied to outstanding/same-cycle request
+P2 PASS Conv feeder guards variable divide/modulo: zero-dimension guards present
+P2 PASS MatMul system DONE waits for AXIS drain: serializer included in BUSY/DONE contract
+P2 PASS randomized MatMul cycle audit: PASS: 1000 random matrix shapes, all tiles, random stalls
+P3 PASS all testbenches are in Vivado list: files=55 listed=55 missing=[] extra=[]
+P3 PASS every TB has explicit PASS and FAIL markers: []
+P3 PASS Vivado flow parses simulator logical result: simulate.log checked
+P3 PASS no unbounded run-all regression: finite XSim runtime
+P4 PASS Ethernet pin map: ETHERNET PIN AUDIT PASS: 14/14 mapped pins match known EBAZ4205 map
+P4 PASS GEM0 EMIO/MII integration configured: PS GEM0 via EMIO
+P4 PASS deterministic 64KiB control maps: NPU/DMA control windows
+P4 PASS MII clocks constrained: 25 MHz external clocks
+P4 PASS implementation guarded by real board preset: refuses guessed DDR/MIO
+P4 PASS bitstream helper uses canonical guarded build: single source of truth
+P5 PASS userspace C builds warning-free: 3 binaries
+P5 PASS DMA RX mmap offset normalized: separate coherent RX allocation
+P5 PASS DMA device single-owner and close-safe: pending DMA cannot survive owner close
+P5 PASS UIO fragment does not overwrite bootargs: existing kernel cmdline preserved
+P5 PASS network server validates MatMul DMA sizes: framing/alignment enforced
+P5 PASS host/network MatMul packers agree: 200 random matrix shapes, mixed bias/no-bias
+FIVE_PASS_SOURCE_AUDIT PASS: 25/25 checks
+[2/8] Final v2 release audit
+PASS legacy five-pass audit :: already executed by outer validator
+PASS exists rtl/axis_maxpool2x2_engine.v
+PASS exists rtl/axis_elementwise_add_engine.v
+PASS exists sim/tb_regs_extended.v
+PASS exists sim/tb_conv_stream_bias.v
+PASS exists sim/tb_axis_maxpool.v
+PASS exists sim/tb_axis_add.v
+PASS exists sim/tb_matmul_bias_feeder.v
+PASS exists sw/host/npu_board_selftest.py
+PASS exists sw/host/npu_benchmark.py
+PASS exists sw/snpu_inspect.py
+PASS hardware identity registers
+PASS hardware perf counters
+PASS hardware IRQ + abort
+PASS four hardware modes
+PASS streamed MatMul/Dense bias integrated
+PASS Conv per-output bias stream
+PASS NPU IRQ wired into PS concat
+PASS 55-test Vivado suite :: files=55 listed=55
+PASS new tests have PASS/FAIL
+PASS all Python compiles
+PASS userspace C warning-clean
+PASS grouped/depthwise Conv packet contract :: 104 randomized cases
+PASS Add packet framing
+PASS MaxPool packet framing
+PASS MatMul streamed bias framing :: bytes=176 shape=(2, 2, 2)
+PASS board selftest dry-run :: packet bytes: {'mm': 176, 'add': 48, 'pool': 128, 'conv': 64, 'dw': 32}
+PASS dry-run packet/golden construction
+PASS SNPU strict pack+inspect :: SNPU v2 layers=2 bytes=36
+000: {'type': 'matmul', 'M': 2, 'N': 2, 'K': 2, 'weights': 4, 'bias': 2}
+001: {'type': 'relu'}
+VALID
+PASS model packer rejects out-of-range INT8
+PASS ONNX converter rejects silent float quantization
+PASS persistent network session + benchmark
+PASS network opcodes INFO/MatMul/Conv/Pool/Add
+PASS network capability skew guard
+PASS network MatMul bias flag
+PASS network timeout abort path
+PASS network Conv framing validation
+FINAL_RELEASE_AUDIT PASS: 36/36
+[3/8] Second independent five-pass audit
+PASS P1 unique RTL module definitions :: {}
+PASS P1 production hierarchy reaches every required engine :: reachable=17
+PASS P1 production hierarchy size stable :: 17 modules
+PASS P1 dead RTL is explicitly legacy/research only :: axis_scalar_output,conv2d_addrgen,conv2d_gemm_feeder,conv2d_memory_top,conv2d_scheduler,conv2d_systolic_engine,double_buffer_ctrl,maxpool2x2,npu_postprocess,npu_v4_top,perf_counters,shared_postprocess
+PASS P1 no merge-conflict markers
+PASS P1 production top exposes control + input/output streams
+PASS P2 MatMul packer parameterized framing + strict INT8
+PASS P2 network MatMul enforces fixed 8x8 + exact INT8 range
+PASS P2 Conv packer guards INT32 accumulator MAC bound
+PASS P2 network Conv stream guards accumulator + unterminated scalar
+PASS P2 legacy Conv arithmetic widened before size checks
+PASS P2 postprocess preserves 33x32 widened arithmetic
+PASS P3 C MatMul tile->row-major converter test :: PASS MatMul tile-major -> row-major layout
+PASS P3 randomized multi-tile output layout contract :: 300 shapes
+PASS P3 server exposes row-major MatMul network ABI
+PASS P3 multi-tile hardware-order regression is in XSim suite
+PASS P3 strict Vivado suite is exactly 55 existing tests :: files=55 listed=55
+PASS P3 XSim Tcl checks logical PASS/FAIL, not process exit only
+PASS P4 userspace C warning-clean after contract fixes
+PASS P4 UIO diagnostic never STARTs an unarmed DMA job
+PASS P4 bare-metal example matches 32-bit DMA result + tile-major layout
+PASS P4 deploy packers contain no silent INT8 clamp
+PASS P4 DMA driver retains ownership/close safety markers
+PASS P4 network timeout/error path aborts DMA/NPU
+PASS P5 deterministic 64K NPU/DMA control address map
+PASS P5 implementation refuses unconfirmed EBAZ PS7/DDR preset
+PASS P5 implementation has explicit setup+hold timing failure gate
+PASS P5 removed known Vivado-2020.2/script regressions
+PASS P5 all Python sources parse
+PASS P5 canonical build gates 55/55 before implementation
+SECOND_FIVE_PASS_AUDIT PASS: 30/30 checks
+[4/8] Third independent five-pass audit
+PASS P1 production sequential logic uses declared synchronous clocks
+PASS P1 abort is synchronously folded into datapath reset
+PASS P1 AXI clock/reset metadata is explicit
+PASS P1 NPU/DMA/control datapath shares FCLK0 domain
+PASS P1 XSim elaboration defaults to low-memory single-thread mode
+PASS P1 board reset is synchronized by proc_sys_reset
+PASS P2 AXI-Lite independently buffers AW/W and holds responses
+PASS P2 AXIS tile output snapshots payload under backpressure
+PASS P2 MatMul DONE waits for final AXIS drain
+PASS P2 memory Conv suppresses duplicate requests during registered sample_fire
+PASS P2 Conv job output buffer/backpressure/final marker state is explicit
+PASS P2 Add/Pool input readiness respects buffered output backpressure
+PASS P3 Conv address arithmetic widens intermediates before multiply/shift
+PASS P3 postprocess preserves bias carry and signed scaled width
+PASS P3 quantization register widths match datapath
+PASS P3 Conv INT32 MAC worst-case bound enforced host+server
+PASS P3 MatMul dimensions cannot exceed 16-bit hardware registers
+PASS P3 elementwise Add uses widened sum plus INT8 saturation
+PASS P4 Python wire structs are fixed and packed
+PASS P4 request/reply ABI sizes are 36/16 bytes :: REQ=36 REP=16
+PASS P4 server validates exact MatMul DMA byte contract
+PASS P4 network MatMul result is normalized to row-major
+PASS P4 randomized client MatMul framing matches server formula :: 200 shapes
+PASS P4 deploy paths do not silently clamp INT8
+PASS P5 Vivado defaults to one worker with override support
+PASS P5 kernel-module validation is also low-memory
+PASS P5 core synthesis has real 100 MHz timing constraint
+PASS P5 full implementation hard-fails negative setup/hold slack
+PASS P5 EBAZ board-support filename matches actual repository
+PASS P5 canonical build gates XSim before full implementation
+THIRD_FIVE_PASS_AUDIT PASS: 30/30 checks
+[5/8] Python syntax (no pycache writes)
+Python syntax PASS
+[6/8] Required integrated release files
+[7/8] Tcl/text regressions
+[8/8] C builds + optional kernel-module compile
+warning: the compiler differs from the one used to build the kernel
+  The kernel was built by: x86_64-linux-gnu-gcc-13 (Ubuntu 13.2.0-23ubuntu4) 13.2.0
+  You are using:           gcc-13 (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+Skipping BTF generation for /workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/sw/linux/npu_dma_proxy.ko due to unavailability of vmlinux
+kernel module compile PASS against /tmp/snpu_deep_tools/headers/usr/src/linux-headers-6.8.0-31-generic
+test_bad_header_and_disconnect (__main__.Tests.test_bad_header_and_disconnect) ... ok
+test_conv_geometry (__main__.Tests.test_conv_geometry) ... ok
+test_empty_model (__main__.Tests.test_empty_model) ... ok
+test_fragmented_reply (__main__.Tests.test_fragmented_reply) ... ok
+test_integer_boundaries (__main__.Tests.test_integer_boundaries) ... ok
+test_integer_fidelity (__main__.Tests.test_integer_fidelity) ... ok
+test_onnx_spatial_attributes (__main__.Tests.test_onnx_spatial_attributes) ... ok
+test_reply_size (__main__.Tests.test_reply_size) ... ok
+test_stream_packers_agree (__main__.Tests.test_stream_packers_agree) ... ok
+test_valid_model_truncation (__main__.Tests.test_valid_model_truncation) ... ok
+test_zero_matmul (__main__.Tests.test_zero_matmul) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.008s
+
+OK
+PASS baremetal DMA completion, submit failures, NPU/DMA timeouts, reset failure, buffer size
+test_01_opcode_negative (__main__.Checks.test_01_opcode_negative) ... ok
+test_02_opcode_overflow (__main__.Checks.test_02_opcode_overflow) ... ok
+test_03_M_negative (__main__.Checks.test_03_M_negative) ... ok
+test_04_N_overflow (__main__.Checks.test_04_N_overflow) ... ok
+test_05_K_overflow (__main__.Checks.test_05_K_overflow) ... ok
+test_06_out_bytes_negative (__main__.Checks.test_06_out_bytes_negative) ... ok
+test_07_id_negative (__main__.Checks.test_07_id_negative) ... ok
+test_08_id_overflow (__main__.Checks.test_08_id_overflow) ... ok
+test_09_flags_fractional (__main__.Checks.test_09_flags_fractional) ... ok
+test_10_shift_fractional (__main__.Checks.test_10_shift_fractional) ... ok
+test_11_multiplier_fractional (__main__.Checks.test_11_multiplier_fractional) ... ok
+test_12_zero_point_fractional (__main__.Checks.test_12_zero_point_fractional) ... ok
+test_13_bad_magic (__main__.Checks.test_13_bad_magic) ... ok
+test_14_bad_id (__main__.Checks.test_14_bad_id) ... ok
+test_15_server_error (__main__.Checks.test_15_server_error) ... ok
+test_16_oversize_body (__main__.Checks.test_16_oversize_body) ... ok
+test_17_header_truncated (__main__.Checks.test_17_header_truncated) ... ok
+test_18_body_truncated (__main__.Checks.test_18_body_truncated) ... ok
+test_19_timeout_setup_closes_socket (__main__.Checks.test_19_timeout_setup_closes_socket) ... ok
+test_20_reconnect_after_bad_reply (__main__.Checks.test_20_reconnect_after_bad_reply) ... ok
+test_21_request_id_wrap (__main__.Checks.test_21_request_id_wrap) ... ok
+test_22_fragmented_body (__main__.Checks.test_22_fragmented_body) ... ok
+test_23_wrapper_validates_before_connect (__main__.Checks.test_23_wrapper_validates_before_connect) ... ok
+test_24_wire_signed_extremes (__main__.Checks.test_24_wire_signed_extremes) ... ok
+test_25_snpu_bad_magic (__main__.Checks.test_25_snpu_bad_magic) ... ok
+test_26_snpu_version (__main__.Checks.test_26_snpu_version) ... ok
+test_27_snpu_empty_layers (__main__.Checks.test_27_snpu_empty_layers) ... ok
+test_28_snpu_unknown_op (__main__.Checks.test_28_snpu_unknown_op) ... ok
+test_29_snpu_truncated_header (__main__.Checks.test_29_snpu_truncated_header) ... ok
+test_30_snpu_M_zero (__main__.Checks.test_30_snpu_M_zero) ... ok
+test_31_snpu_N_zero (__main__.Checks.test_31_snpu_N_zero) ... ok
+test_32_snpu_K_zero (__main__.Checks.test_32_snpu_K_zero) ... ok
+test_33_snpu_weight_count (__main__.Checks.test_33_snpu_weight_count) ... ok
+test_34_snpu_bias_count (__main__.Checks.test_34_snpu_bias_count) ... ok
+test_35_snpu_conv_H_zero (__main__.Checks.test_35_snpu_conv_H_zero) ... ok
+test_36_snpu_conv_W_zero (__main__.Checks.test_36_snpu_conv_W_zero) ... ok
+test_37_snpu_conv_C_zero (__main__.Checks.test_37_snpu_conv_C_zero) ... ok
+test_38_snpu_conv_O_zero (__main__.Checks.test_38_snpu_conv_O_zero) ... ok
+test_39_snpu_conv_stride_zero (__main__.Checks.test_39_snpu_conv_stride_zero) ... ok
+test_40_snpu_conv_kernel_too_large (__main__.Checks.test_40_snpu_conv_kernel_too_large) ... ok
+test_41_packer_ragged_A (__main__.Checks.test_41_packer_ragged_A) ... ok
+test_42_packer_ragged_B (__main__.Checks.test_42_packer_ragged_B) ... ok
+test_43_packer_empty_matrix (__main__.Checks.test_43_packer_empty_matrix) ... ok
+test_44_packer_i8_overflow (__main__.Checks.test_44_packer_i8_overflow) ... ok
+test_45_packer_i8_underflow (__main__.Checks.test_45_packer_i8_underflow) ... ok
+test_46_packer_bias_overflow (__main__.Checks.test_46_packer_bias_overflow) ... ok
+test_47_packer_bias_count (__main__.Checks.test_47_packer_bias_count) ... ok
+test_48_packer_conv_group_mismatch (__main__.Checks.test_48_packer_conv_group_mismatch) ... ok
+test_49_server_SIGTERM_idle_accept (__main__.Checks.test_49_server_SIGTERM_idle_accept) ... PASS prompt SIGTERM shutdown
+ok
+test_50_server_SIGTERM_partial_request (__main__.Checks.test_50_server_SIGTERM_partial_request) ... PASS prompt SIGTERM shutdown
+ok
+
+----------------------------------------------------------------------
+Ran 50 tests in 0.146s
+
+OK
+FINAL RELEASE STATIC VALIDATION PASS

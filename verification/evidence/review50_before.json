@@ -1,0 +1,220 @@
+{
+  "source": "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_DEEP_REVIEW",
+  "run": 50,
+  "passed": 37,
+  "checks": [
+    {
+      "check": "test_01_opcode_negative",
+      "passed": false,
+      "kind": "failure"
+    },
+    {
+      "check": "test_02_opcode_overflow",
+      "passed": false,
+      "kind": "failure"
+    },
+    {
+      "check": "test_03_M_negative",
+      "passed": false,
+      "kind": "failure"
+    },
+    {
+      "check": "test_04_N_overflow",
+      "passed": false,
+      "kind": "failure"
+    },
+    {
+      "check": "test_05_K_overflow",
+      "passed": false,
+      "kind": "failure"
+    },
+    {
+      "check": "test_06_out_bytes_negative",
+      "passed": false,
+      "kind": "failure"
+    },
+    {
+      "check": "test_07_id_negative",
+      "passed": false,
+      "kind": "failure"
+    },
+    {
+      "check": "test_08_id_overflow",
+      "passed": false,
+      "kind": "failure"
+    },
+    {
+      "check": "test_09_flags_fractional",
+      "passed": false,
+      "kind": "error"
+    },
+    {
+      "check": "test_10_shift_fractional",
+      "passed": true
+    },
+    {
+      "check": "test_11_multiplier_fractional",
+      "passed": true
+    },
+    {
+      "check": "test_12_zero_point_fractional",
+      "passed": true
+    },
+    {
+      "check": "test_13_bad_magic",
+      "passed": true
+    },
+    {
+      "check": "test_14_bad_id",
+      "passed": true
+    },
+    {
+      "check": "test_15_server_error",
+      "passed": true
+    },
+    {
+      "check": "test_16_oversize_body",
+      "passed": true
+    },
+    {
+      "check": "test_17_header_truncated",
+      "passed": true
+    },
+    {
+      "check": "test_18_body_truncated",
+      "passed": true
+    },
+    {
+      "check": "test_19_timeout_setup_closes_socket",
+      "passed": false,
+      "kind": "failure"
+    },
+    {
+      "check": "test_20_reconnect_after_bad_reply",
+      "passed": true
+    },
+    {
+      "check": "test_21_request_id_wrap",
+      "passed": true
+    },
+    {
+      "check": "test_22_fragmented_body",
+      "passed": true
+    },
+    {
+      "check": "test_23_wrapper_validates_before_connect",
+      "passed": false,
+      "kind": "failure"
+    },
+    {
+      "check": "test_24_wire_signed_extremes",
+      "passed": true
+    },
+    {
+      "check": "test_25_snpu_bad_magic",
+      "passed": true
+    },
+    {
+      "check": "test_26_snpu_version",
+      "passed": true
+    },
+    {
+      "check": "test_27_snpu_empty_layers",
+      "passed": true
+    },
+    {
+      "check": "test_28_snpu_unknown_op",
+      "passed": true
+    },
+    {
+      "check": "test_29_snpu_truncated_header",
+      "passed": true
+    },
+    {
+      "check": "test_30_snpu_M_zero",
+      "passed": true
+    },
+    {
+      "check": "test_31_snpu_N_zero",
+      "passed": true
+    },
+    {
+      "check": "test_32_snpu_K_zero",
+      "passed": true
+    },
+    {
+      "check": "test_33_snpu_weight_count",
+      "passed": true
+    },
+    {
+      "check": "test_34_snpu_bias_count",
+      "passed": true
+    },
+    {
+      "check": "test_35_snpu_conv_H_zero",
+      "passed": true
+    },
+    {
+      "check": "test_36_snpu_conv_W_zero",
+      "passed": true
+    },
+    {
+      "check": "test_37_snpu_conv_C_zero",
+      "passed": true
+    },
+    {
+      "check": "test_38_snpu_conv_O_zero",
+      "passed": true
+    },
+    {
+      "check": "test_39_snpu_conv_stride_zero",
+      "passed": true
+    },
+    {
+      "check": "test_40_snpu_conv_kernel_too_large",
+      "passed": true
+    },
+    {
+      "check": "test_41_packer_ragged_A",
+      "passed": true
+    },
+    {
+      "check": "test_42_packer_ragged_B",
+      "passed": true
+    },
+    {
+      "check": "test_43_packer_empty_matrix",
+      "passed": true
+    },
+    {
+      "check": "test_44_packer_i8_overflow",
+      "passed": true
+    },
+    {
+      "check": "test_45_packer_i8_underflow",
+      "passed": true
+    },
+    {
+      "check": "test_46_packer_bias_overflow",
+      "passed": true
+    },
+    {
+      "check": "test_47_packer_bias_count",
+      "passed": true
+    },
+    {
+      "check": "test_48_packer_conv_group_mismatch",
+      "passed": true
+    },
+    {
+      "check": "test_49_server_SIGTERM_idle_accept",
+      "passed": false,
+      "kind": "error"
+    },
+    {
+      "check": "test_50_server_SIGTERM_partial_request",
+      "passed": false,
+      "kind": "error"
+    }
+  ]
+}

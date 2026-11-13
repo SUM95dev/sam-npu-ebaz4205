@@ -1,0 +1,2 @@
+PASS shape=1,9,1 bias=False
+/tmp/snpu_hdl/case_0_0.v:100: $finish called at 5230000 (1ps)

@@ -1,0 +1,36 @@
+{
+  "rtl_file_count": 23,
+  "module_count": 23,
+  "static_issues": [],
+  "python_files": [
+    "sw/model_packer.py",
+    "sw/pack_conv_stream.py",
+    "sw/cycle_audit.py",
+    "sw/golden_model.py",
+    "sw/pack_matmul_stream.py"
+  ],
+  "python_compile_errors": [],
+  "example_model_pack": "/mnt/data/Sam_NPU_COMPLETE_INTEGRATED/sw/example_model.snpu",
+  "major_features": [
+    "8x8 INT8 systolic MatMul/Dense",
+    "shared postprocess Bias/ReLU/requant",
+    "banked BRAM + double-buffer controller",
+    "MaxPool2x2 + perf counters",
+    "AXI4-Lite control wrapper",
+    "AXI-Stream DMA integration",
+    "streaming Conv path",
+    "hardware Conv2D scheduler/address path",
+    "parallel Conv2D systolic frontend/engine",
+    "Vitis bare-metal runtime example",
+    "Linux UIO control runtime",
+    "custom SNPU model package/packer",
+    "Vivado PS7 + AXI DMA skeleton"
+  ],
+  "not_verified": [
+    "Vivado xvlog/xelab/xsim",
+    "synthesis/utilization",
+    "timing closure",
+    "bitstream on EBAZ4205",
+    "exact PS7 DDR preset inside package"
+  ]
+}

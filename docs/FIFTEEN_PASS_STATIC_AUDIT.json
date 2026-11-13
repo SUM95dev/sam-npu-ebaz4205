@@ -1,0 +1,25 @@
+{
+  "modules_detected": [
+    "conv2d_stream_engine",
+    "double_buffer_ctrl",
+    "matmul_controller",
+    "matmul_engine",
+    "maxpool2x2",
+    "npu_pe",
+    "npu_postprocess",
+    "npu_regs",
+    "npu_v4_top",
+    "perf_counters",
+    "systolic_array",
+    "tile_postprocess"
+  ],
+  "rtl_files": 12,
+  "sim_files": 15,
+  "issues": [
+    "rtl/matmul_engine.v:ctrl unknown ports for matmul_engine: ['clear_acc', 'flush_en', 'output_valid', 'post_done', 'post_start']; known=['K', 'M', 'Ndim', 'a_left', 'b_top', 'bias_flat', 'busy', 'clk', 'done', 'feed_req', 'feed_step', 'feed_valid', 'out_lane_valid', 'out_tile', 'out_tile_valid', 'qmul', 'qshift', 'relu_en', 'rst', 'start', 'tile_m', 'tile_n', 'zero_point']",
+    "rtl/conv2d_stream_engine.v:pp_i unknown ports for conv2d_stream_engine: ['acc_in', 'bias_in', 'multiplier', 'out', 'shift']; known=['activation', 'bias', 'busy', 'clk', 'done', 'last_sample', 'out_data', 'out_valid', 'qmul', 'qshift', 'relu_en', 'rst', 'sample_ready', 'sample_valid', 'start', 'weight', 'zero_point']",
+    "rtl/systolic_array.v:u_pe unknown ports for systolic_array: ['a_in', 'a_out', 'acc', 'b_in', 'b_out']; known=['a_left', 'acc_flat', 'b_top', 'clear_acc', 'clk', 'en', 'rst']",
+    "rtl/npu_v4_top.v:mm_i unknown ports for npu_v4_top: ['K', 'M', 'Ndim', 'out_lane_valid', 'out_tile', 'out_tile_valid', 'qmul', 'qshift', 'relu_en', 'start', 'zero_point']; known=['a_left', 'b_top', 'bias_flat', 'busy', 'clk', 'conv_activation', 'conv_bias', 'conv_last_sample', 'conv_out', 'conv_out_valid', 'conv_sample_ready', 'conv_sample_valid', 'conv_weight', 'done', 'feed_req', 'feed_step', 'feed_valid', 'matmul_lane_valid', 'matmul_out', 'matmul_out_valid', 'reg_raddr', 'reg_rd', 'reg_rdata', 'reg_waddr', 'reg_wdata', 'reg_wr', 'rst', 'tile_m', 'tile_n']",
+    "rtl/tile_postprocess.v:pp_i unknown ports for tile_postprocess: ['acc_in', 'bias_in', 'multiplier', 'out', 'shift']; known=['acc_flat', 'bias_flat', 'busy', 'clk', 'done', 'out_tile', 'qmul', 'qshift', 'relu_en', 'rst', 'start', 'zero_point']"
+  ]
+}

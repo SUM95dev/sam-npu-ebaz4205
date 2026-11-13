@@ -1,0 +1,2 @@
+PASS CONTROL WSTRB
+/tmp/snpu_hdl/tb_control_wstrb.v:39: $finish called at 310000 (1ps)

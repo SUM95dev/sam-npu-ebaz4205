@@ -1,0 +1,435 @@
+--- a/rtl/conv2d_stream_engine.v
++++ b/rtl/conv2d_stream_engine.v
+@@ -31,6 +31,10 @@
+     wire signed [ACC_W-1:0] sum_next;
+     wire signed [DATA_W-1:0] post_out;
+     wire start_accept;
++    reg processing;
++    reg pp_start;
++    reg signed [ACC_W-1:0] pp_acc_hold;
++    wire pp_valid;
+     wire signed [ACC_W-1:0] pp_bias;
+     wire pp_relu;
+     wire signed [31:0] pp_qmul;
+@@ -39,7 +43,7 @@
+ 
+     assign start_accept = start && !busy;
+     assign prod = activation * weight;
+-    assign sample_ready = busy || start_accept;
++    assign sample_ready = (busy || start_accept) && !processing;
+     assign add_base = start_accept ? 0 : acc;
+     assign sum_next = add_base + prod;
+     assign pp_bias = start_accept ? bias : bias_latched;
+@@ -48,17 +52,18 @@
+     assign pp_qshift = start_accept ? qshift : qshift_latched;
+     assign pp_zero_point = start_accept ? zero_point : zero_point_latched;
+ 
+-    npu_postprocess #(.ACC_W(ACC_W),.OUT_W(DATA_W)) pp_i(
+-        .acc_in(sum_next),.bias_in(pp_bias),.relu_en(pp_relu),
+-        .multiplier(pp_qmul),.shift(pp_qshift),.zero_point(pp_zero_point),.out(post_out)
++    npu_postprocess_pipe #(.ACC_W(ACC_W),.OUT_W(DATA_W)) pp_i(
++        .clk(clk),.rst(rst),.in_valid(pp_start),.out_valid(pp_valid),
++        .acc_in(pp_acc_hold),.bias_in(bias_latched),.relu_en(relu_latched),
++        .multiplier(qmul_latched),.shift(qshift_latched),.zero_point(zero_point_latched),.out(post_out)
+     );
+ 
+     always @(posedge clk) begin
+         if (rst) begin
+-            acc<=0; out_data<=0; out_valid<=0; busy<=0; done<=0;
++            acc<=0; out_data<=0; out_valid<=0; busy<=0; done<=0;processing<=0;pp_start<=0;pp_acc_hold<=0;
+             bias_latched<=0; relu_latched<=0; qmul_latched<=1; qshift_latched<=0; zero_point_latched<=0;
+         end else begin
+-            out_valid<=0; done<=0;
++            out_valid<=0; done<=0; pp_start<=0;
+             if (start_accept) begin
+                 acc<=0; busy<=1;
+                 bias_latched<=bias;
+@@ -68,13 +73,16 @@
+                 zero_point_latched<=zero_point;
+             end
+ 
+-            if ((busy || start_accept) && sample_valid) begin
++            if (sample_ready && sample_valid) begin
+                 if (last_sample) begin
+-                    out_data<=post_out; out_valid<=1; acc<=0; busy<=0; done<=1;
++                    pp_acc_hold<=sum_next;pp_start<=1;processing<=1;acc<=0;
+                 end else begin
+                     acc<=sum_next; busy<=1;
+                 end
+             end
++            if(pp_valid && processing) begin
++                out_data<=post_out;out_valid<=1;busy<=0;done<=1;processing<=0;
++            end
+         end
+     end
+ endmodule
+--- a/rtl/conv_stream_job_engine.v
++++ b/rtl/conv_stream_job_engine.v
+@@ -37,7 +37,7 @@
+ 
+     // Do not accept a new sample during the cycle in which the previous
+     // output arrives. This gives the one-entry output buffer an unambiguous handoff.
+-    assign sample_ready = job_active && !core_out_valid &&
++    assign sample_ready = job_active && !core_out_valid && (!core_busy || core_ready) &&
+                           (!last_sample || output_space);
+     wire fire = sample_valid && sample_ready;
+     // core_start is true only for the first accepted sample of each output scalar.
+--- a/rtl/matmul_controller.v
++++ b/rtl/matmul_controller.v
+@@ -79,6 +79,7 @@
+                     if (feed_accept) begin
+                         if (accepted + 1 >= feed_cycles_latched) begin
+                             accepted<=accepted+1'b1;
++                            feed_req<=0;
+                             flush_count<=0;
+                             // Pre-assert flush_en so the array sees the first
+                             // zero-flush on the very next clock edge.  Without
+--- a/rtl/npu_regs.v
++++ b/rtl/npu_regs.v
+@@ -149,7 +149,7 @@
+ 
+             if (wr_en && !cfg_locked) begin
+                 case (wr_addr[5:2])
+-                    4'h0: begin
++                    4'h0: if (wr_strb[0]) begin
+                         mode_conv<=wr_data[1];
+                         mode_pool<=wr_data[2];
+                         mode_add<=wr_data[3];
+--- a/rtl/tile_postprocess.v
++++ b/rtl/tile_postprocess.v
+@@ -20,6 +20,10 @@
+     localparam IDX_W = (LANES <= 2) ? 1 : $clog2(LANES);
+ 
+     reg [IDX_W-1:0] lane_idx;
++    reg feeding;
++    reg [IDX_W-1:0] lane_pipe[0:5];
++    wire pp_valid;
++    integer j;
+     wire signed [ACC_W-1:0] acc_i;
+     wire signed [ACC_W-1:0] bias_i;
+     wire signed [DATA_W-1:0] out_i;
+@@ -27,31 +31,28 @@
+     assign acc_i  = acc_flat [lane_idx*ACC_W  +: ACC_W];
+     assign bias_i = bias_flat[lane_idx*ACC_W  +: ACC_W];
+ 
+-    npu_postprocess #(.ACC_W(ACC_W),.OUT_W(DATA_W)) pp_i(
++    npu_postprocess_pipe #(.ACC_W(ACC_W),.OUT_W(DATA_W)) pp_i(
++        .clk(clk),.rst(rst),.in_valid(busy && feeding),.out_valid(pp_valid),
+         .acc_in(acc_i),.bias_in(bias_i),.relu_en(relu_en),
+         .multiplier(qmul),.shift(qshift),.zero_point(zero_point),.out(out_i)
+     );
+ 
+     always @(posedge clk) begin
+         if (rst) begin
+-            lane_idx <= 0;
+-            out_tile <= 0;
+-            busy <= 0;
+-            done <= 0;
++            lane_idx<=0;out_tile<=0;busy<=0;done<=0;feeding<=0;
++            for(j=0;j<6;j=j+1) lane_pipe[j]<=0;
+         end else begin
+-            done <= 0;
+-            if (start && !busy) begin
+-                lane_idx <= 0;
+-                busy <= 1;
+-            end else if (busy) begin
+-                out_tile[lane_idx*DATA_W +: DATA_W] <= out_i;
+-                if (lane_idx == LANES-1) begin
+-                    busy <= 0;
+-                    done <= 1;
+-                    lane_idx <= 0;
+-                end else begin
+-                    lane_idx <= lane_idx + 1'b1;
+-                end
++            done<=0;
++            lane_pipe[0]<=lane_idx;
++            for(j=1;j<6;j=j+1) lane_pipe[j]<=lane_pipe[j-1];
++            if(start && !busy) begin lane_idx<=0;feeding<=1;busy<=1;end
++            else if(busy && feeding) begin
++                if(lane_idx==LANES-1) feeding<=0;
++                else lane_idx<=lane_idx+1'b1;
++            end
++            if(pp_valid && busy) begin
++                out_tile[lane_pipe[5]*DATA_W +: DATA_W]<=out_i;
++                if(lane_pipe[5]==LANES-1) begin busy<=0;done<=1;end
+             end
+         end
+     end
+--- a/scripts/build_ebaz4205_final.sh
++++ b/scripts/build_ebaz4205_final.sh
+@@ -22,16 +22,19 @@
+ fi
+ 
+ if [[ "$RUN_XSIM" == "1" ]]; then
+-  echo "=== 28-TEST XSIM + CORE SYNTHESIS ==="
++  echo "=== 51-TEST XSIM + CORE SYNTHESIS ==="
+   "$VIVADO" -mode batch -source scripts/run_vivado_verification.tcl | tee full_verify.log
+-  grep -q 'SIM SUMMARY: PASS=28 FAIL=0' full_verify.log || {
+-    echo "ERROR: strict 28/28 XSim gate not observed" >&2; exit 4;
++  grep -q 'SIM SUMMARY: PASS=51 FAIL=0' full_verify.log || {
++    echo "ERROR: strict 51/51 XSim gate not observed" >&2; exit 4;
+   }
+ fi
+ 
+ echo "=== FULL EBAZ4205 SYNTHESIS + IMPLEMENTATION + BITSTREAM ==="
+ RUN_SYNTH=1 RUN_IMPL=1 "$VIVADO" -mode batch -source scripts/build_ebaz4205_system.tcl | tee ebaz_final_build.log
+ 
++grep -q '^BUILD FLOW COMPLETE$' ebaz_final_build.log || {
++  echo "ERROR: full build did not reach its final completion marker" >&2; exit 5;
++}
+ echo "=== REPORT SUMMARY ==="
+ "$ROOT/scripts/summarize_ebaz_reports.sh" || true
+ 
+--- a/scripts/build_ebaz4205_system.tcl
++++ b/scripts/build_ebaz4205_system.tcl
+@@ -13,6 +13,7 @@
+ set part_name  "xc7z010clg400-1"
+ # Low-RAM safe default for Sam's 4 GiB laptop. Override explicitly only on a
+ # machine with enough memory: VIVADO_JOBS=2 (or higher).
++set_param general.maxThreads 1
+ set vivado_jobs 1
+ if {[info exists ::env(VIVADO_JOBS)] && [string is integer -strict $::env(VIVADO_JOBS)] && $::env(VIVADO_JOBS) > 0} {
+     set vivado_jobs $::env(VIVADO_JOBS)
+@@ -109,10 +110,10 @@
+         error "synth_1 did not complete successfully: $synth_status"
+     }
+     open_run synth_1
+-    report_utilization -force -file [file join $root_dir reports_ebaz utilization_synth.rpt]
+-    report_timing_summary -force -file [file join $root_dir reports_ebaz timing_synth.rpt]
++    report_utilization -file [file join $root_dir reports_ebaz utilization_synth.rpt]
++    report_timing_summary -file [file join $root_dir reports_ebaz timing_synth.rpt]
+     check_timing -verbose -file [file join $root_dir reports_ebaz check_timing_synth.rpt]
+-    report_drc -force -file [file join $root_dir reports_ebaz drc_synth.rpt]
++    report_drc -file [file join $root_dir reports_ebaz drc_synth.rpt]
+ }
+ 
+ if {$run_impl} {
+@@ -120,7 +121,7 @@
+         error "RUN_IMPL requested without a confirmed EBAZ4205 PS7 DDR/MIO board preset. Refusing to guess DDR/MIO configuration."
+     }
+     puts "INFO: launching implementation + bitstream"
+-    launch_runs impl_1 -to_step write_bitstream -jobs $vivado_jobs
++    launch_runs impl_1 -to_step route_design -jobs $vivado_jobs
+     wait_on_run impl_1
+     set impl_status [get_property STATUS [get_runs impl_1]]
+     puts "INFO: impl_1 STATUS=$impl_status"
+@@ -128,11 +129,11 @@
+         error "impl_1 did not complete successfully: $impl_status"
+     }
+     open_run impl_1
+-    report_utilization -force -file [file join $root_dir reports_ebaz utilization_impl.rpt]
+-    report_timing_summary -force -file [file join $root_dir reports_ebaz timing_impl.rpt]
++    report_utilization -file [file join $root_dir reports_ebaz utilization_impl.rpt]
++    report_timing_summary -file [file join $root_dir reports_ebaz timing_impl.rpt]
+     check_timing -verbose -file [file join $root_dir reports_ebaz check_timing_impl.rpt]
+-    report_route_status -force -file [file join $root_dir reports_ebaz route_status.rpt]
+-    report_drc -force -file [file join $root_dir reports_ebaz drc_impl.rpt]
++    report_route_status -file [file join $root_dir reports_ebaz route_status.rpt]
++    report_drc -file [file join $root_dir reports_ebaz drc_impl.rpt]
+ 
+     # A completed implementation run can still violate timing.  Treat both
+     # setup and hold slack as release gates instead of merely generating a
+@@ -148,6 +149,15 @@
+     if {$setup_slack < 0.0} { error "Final implementation fails setup timing: WNS=$setup_slack ns" }
+     if {$hold_slack  < 0.0} { error "Final implementation fails hold timing: WHS=$hold_slack ns" }
+ 
++    # Release a bitstream only after routed setup/hold gates above pass.
++    close_design
++    launch_runs impl_1 -to_step write_bitstream -jobs $vivado_jobs
++    wait_on_run impl_1
++    set bit_status [get_property STATUS [get_runs impl_1]]
++    if {![string match "*write_bitstream Complete*" $bit_status]} {
++        error "Bitstream generation failed: $bit_status"
++    }
++    open_run impl_1
+     write_hw_platform -fixed -include_bit -force -file [file join $root_dir reports_ebaz Sam_NPU_EBAZ4205.xsa]
+ }
+ 
+--- a/scripts/fifty_pass_audit.py
++++ b/scripts/fifty_pass_audit.py
+@@ -5,7 +5,7 @@
+ checks=[]
+ def add(name,ok,detail=''):
+     checks.append({'pass':len(checks)+1,'name':name,'ok':bool(ok),'detail':str(detail)})
+-rtl=list((root/'rtl').glob('*.v')); sim=list((root/'sim').glob('*.v')); allv=rtl+sim
++rtl=list((root/'rtl').glob('*.v')); sim=list((root/'sim').glob('*.v'))+list((root/'verification/extra').glob('*.v')); allv=rtl+sim
+ mods={};dup=[]
+ for p in rtl:
+     for m in re.findall(r'\bmodule\s+([A-Za-z_]\w*)',p.read_text()):
+@@ -62,7 +62,7 @@
+ else:
+     add('Linux UIO userspace C syntax',False,'no C compiler found: tried gcc/clang/cc')
+     add('Linux DMA test C syntax',False,'no C compiler found: tried gcc/clang/cc')
+-ver=(root/'scripts/run_vivado_verification.tcl').read_text();tbs=re.findall(r'^\s+(tb_[A-Za-z0-9_]+)\s*$',ver,re.M);existing={p.stem for p in sim};add('Vivado script testbench names exist',all(x in existing for x in tbs),[x for x in tbs if x not in existing]);add('Vivado synthesis top exists','set_property top npu_axis_system_top' in ver);add('Vivado part is XC7Z010 CLG400','xc7z010clg400-1' in ver.lower())
++ver=(root/'scripts/run_vivado_verification.tcl').read_text();tbs=re.findall(r'^\s+(tb_[A-Za-z0-9_]+)\s*$',ver,re.M);existing={('tb_'+p.stem if p.stem.startswith('case_') else p.stem) for p in sim};add('Vivado script testbench names exist',all(x in existing for x in tbs),[x for x in tbs if x not in existing]);add('Vivado synthesis top exists','set_property top npu_axis_system_top' in ver);add('Vivado part is XC7Z010 CLG400','xc7z010clg400-1' in ver.lower())
+ add('Board DDR config not fabricated','do not' in (root/'docs/EBAZ4205_VIVADO_2020_2.md').read_text().lower());add('Hardware verification limitation documented','hardware verified' in (root/'README_COMPLETE.md').read_text().lower())
+ zp='/tmp/npu_audit.zip'
+ with zipfile.ZipFile(zp,'w',zipfile.ZIP_DEFLATED) as z:
+--- a/scripts/final_release_audit.py
++++ b/scripts/final_release_audit.py
+@@ -27,8 +27,8 @@
+ ck('Conv per-output bias stream','sample_bias' in top and 's_axis_tdata[63:32]' in (ROOT/'rtl/axis_conv_adapter.v').read_text())
+ ck('NPU IRQ wired into PS concat','CONFIG.NUM_PORTS {3}' in bd and 'npu_0/irq' in bd)
+ 
+-vt=(ROOT/'scripts/run_vivado_verification.tcl').read_text(); tbs=list((ROOT/'sim').glob('tb_*.v')); listed=set(re.findall(r'^\s+(tb_[A-Za-z0-9_]+)\s*$',vt,re.M))
+-ck('28-test Vivado suite',len(tbs)==28 and listed=={p.stem for p in tbs},f'files={len(tbs)} listed={len(listed)}')
++vt=(ROOT/'scripts/run_vivado_verification.tcl').read_text(); tbs=list((ROOT/'sim').glob('tb_*.v'))+list((ROOT/'verification/extra').glob('*.v')); listed=set(re.findall(r'^\s+(tb_[A-Za-z0-9_]+)\s*$',vt,re.M))
++ck('51-test Vivado suite',len(tbs)==51 and listed=={('tb_'+p.stem if p.stem.startswith('case_') else p.stem) for p in tbs},f'files={len(tbs)} listed={len(listed)}')
+ ck('new tests have PASS/FAIL',all('PASS' in p.read_text() and 'FAIL' in p.read_text() for p in tbs))
+ 
+ # Compile every Python file in-process. This checks syntax without creating
+--- a/scripts/five_more_pass_audit.py
++++ b/scripts/five_more_pass_audit.py
+@@ -32,11 +32,11 @@
+     x=stack.pop()
+     if x in reach: continue
+     reach.add(x); stack += sorted(graph.get(x,set())-reach)
+-required={'npu_bd_top','npu_axis_system_top','npu_axi_lite_slave','npu_regs','axis_matmul_feeder','matmul_engine','matmul_controller','systolic_array','npu_pe','tile_postprocess','npu_postprocess','axis_tile_output','axis_conv_adapter','conv_stream_job_engine','conv2d_stream_engine','axis_maxpool2x2_engine','axis_elementwise_add_engine'}
++required={'npu_bd_top','npu_axis_system_top','npu_axi_lite_slave','npu_regs','axis_matmul_feeder','matmul_engine','matmul_controller','systolic_array','npu_pe','tile_postprocess','npu_postprocess_pipe','axis_tile_output','axis_conv_adapter','conv_stream_job_engine','conv2d_stream_engine','axis_maxpool2x2_engine','axis_elementwise_add_engine'}
+ add(required <= reach,'P1 production hierarchy reaches every required engine',f'reachable={len(reach)}')
+ add('npu_bd_top' in mods and len(reach)==17,'P1 production hierarchy size stable',f'{len(reach)} modules')
+ unreachable=set(mods)-reach
+-allowed_legacy={'axis_scalar_output','conv2d_addrgen','conv2d_gemm_feeder','conv2d_memory_top','conv2d_scheduler','conv2d_systolic_engine','double_buffer_ctrl','maxpool2x2','npu_v4_top','perf_counters','shared_postprocess'}
++allowed_legacy={'npu_postprocess','axis_scalar_output','conv2d_addrgen','conv2d_gemm_feeder','conv2d_memory_top','conv2d_scheduler','conv2d_systolic_engine','double_buffer_ctrl','maxpool2x2','npu_v4_top','perf_counters','shared_postprocess'}
+ add(unreachable==allowed_legacy,'P1 dead RTL is explicitly legacy/research only',','.join(sorted(unreachable)))
+ alltext='\n'.join(f.read_text(errors='replace') for f in rtl_files)
+ add(not re.search(r'(?m)^(<<<<<<<|=======|>>>>>>>)',alltext),'P1 no merge-conflict markers')
+@@ -115,10 +115,10 @@
+ srv=txt('sw/linux/npu_net_server.c')
+ add('sam_npu_matmul_tile_to_row_major(tx, rx, M, N, 8u)' in srv and 'reply_data = tx' in srv,'P3 server exposes row-major MatMul network ABI')
+ tcl=txt('scripts/run_vivado_verification.tcl')
+-tb_files=list((root/'sim').glob('tb_*.v'))
++tb_files=list((root/'sim').glob('tb_*.v'))+list((root/'verification/extra').glob('*.v'))
+ listed=re.findall(r'(?m)^\s*(tb_[A-Za-z0-9_]+)\s*$',tcl)
+ add((root/'sim/tb_matmul_multitile_order.v').exists() and 'tb_matmul_multitile_order' in listed,'P3 multi-tile hardware-order regression is in XSim suite')
+-add(len(tb_files)==28 and len(set(listed))==28 and all((root/'sim'/f'{x}.v').exists() for x in listed),'P3 strict Vivado suite is exactly 28 existing tests',f'files={len(tb_files)} listed={len(set(listed))}')
++add(len(tb_files)==51 and len(set(listed))==51 and set(listed)=={('tb_'+p.stem if p.stem.startswith('case_') else p.stem) for p in tb_files},'P3 strict Vivado suite is exactly 51 existing tests',f'files={len(tb_files)} listed={len(set(listed))}')
+ add('regexp -line {^FAIL}' in tcl and 'regexp -line {^PASS}' in tcl and 'testbench emitted FAIL' in tcl,'P3 XSim Tcl checks logical PASS/FAIL, not process exit only')
+ 
+ # ---------- Pass 4: software/RTL contract safety ----------
+@@ -158,7 +158,7 @@
+     try: compile(p.read_text(),str(p),'exec')
+     except Exception as e: ok=False; bad.append(f'{p.name}:{e}')
+ add(ok,'P5 all Python sources parse', '; '.join(bad[:3]))
+-add('SIM SUMMARY: PASS=28 FAIL=0' in final and 'RUN_IMPL=1' in final,'P5 canonical build gates 28/28 before implementation')
++add('SIM SUMMARY: PASS=51 FAIL=0' in final and 'RUN_IMPL=1' in final,'P5 canonical build gates 51/51 before implementation')
+ 
+ fails=[x for x in checks if not x[0]]
+ print(f"SECOND_FIVE_PASS_AUDIT {'PASS' if not fails else 'FAIL'}: {len(checks)-len(fails)}/{len(checks)} checks")
+--- a/scripts/five_pass_source_audit.py
++++ b/scripts/five_pass_source_audit.py
+@@ -45,7 +45,7 @@
+ 
+ # PASS 3: verification flow itself
+ vt=(ROOT/'scripts/run_vivado_verification.tcl').read_text()
+-tbs=sorted(p.stem for p in (ROOT/'sim').glob('tb_*.v'))
++tbs=sorted([p.stem for p in (ROOT/'sim').glob('tb_*.v')]+[('tb_'+p.stem if p.stem.startswith('case_') else p.stem) for p in (ROOT/'verification/extra').glob('*.v')])
+ listed=re.findall(r'^\s+(tb_[A-Za-z0-9_]+)\s*$',vt,re.M)
+ check(3,'all testbenches are in Vivado list',set(tbs)==set(listed),f'files={len(tbs)} listed={len(listed)} missing={sorted(set(tbs)-set(listed))} extra={sorted(set(listed)-set(tbs))}')
+ missing_markers=[]
+@@ -54,7 +54,7 @@
+     if not re.search(r'\bPASS',s) or not re.search(r'\bFAIL',s): missing_markers.append(p.name)
+ check(3,'every TB has explicit PASS and FAIL markers',not missing_markers,missing_markers)
+ check(3,'Vivado flow parses simulator logical result','regexp -line {^FAIL}' in vt and 'regexp -line {^PASS}' in vt,'simulate.log checked')
+-check(3,'no unbounded run-all regression','run all' not in vt and 'xsim.simulate.runtime {1000ns}' in vt,'finite XSim runtime')
++check(3,'no unbounded run-all regression','run all' not in vt and 'xsim.simulate.runtime {200us}' in vt,'finite XSim runtime')
+ 
+ # PASS 4: board/pins/clock/address/build safety
+ r=run([sys.executable,'scripts/check_ethernet_pins.py'])
+--- a/scripts/run_vivado_verification.tcl
++++ b/scripts/run_vivado_verification.tcl
+@@ -16,6 +16,7 @@
+ set part_name  "xc7z010clg400-1"
+ # Low-RAM safe default for Sam's 4 GiB laptop. Override explicitly only on a
+ # machine with enough memory: VIVADO_JOBS=2 (or higher).
++set_param general.maxThreads 1
+ set vivado_jobs 1
+ if {[info exists ::env(VIVADO_JOBS)] && [string is integer -strict $::env(VIVADO_JOBS)] && $::env(VIVADO_JOBS) > 0} {
+     set vivado_jobs $::env(VIVADO_JOBS)
+@@ -26,14 +27,14 @@
+ create_project Sam_NPU_Verify $proj_dir -part $part_name -force
+ 
+ set rtl_files [glob -nocomplain [file join $root_dir rtl *.v]]
+-set sim_files [glob -nocomplain [file join $root_dir sim *.v]]
++set sim_files [concat [glob -nocomplain [file join $root_dir sim *.v]] [glob -nocomplain [file join $root_dir verification extra *.v]]]
+ add_files $rtl_files
+ add_files -fileset sim_1 $sim_files
+ update_compile_order -fileset sources_1
+ update_compile_order -fileset sim_1
+ 
+ # Each testbench should finish itself; keep a finite simulator runtime as a safety net.
+-set_property xsim.simulate.runtime {1000ns} [get_filesets sim_1]
++set_property xsim.simulate.runtime {200us} [get_filesets sim_1]
+ # XSim/xelab defaults to aggressive automatic multithreading (the earlier run
+ # used eight slave threads). On a 4 GiB machine that can amplify memory pressure.
+ # Vivado 2020.2 supports xsim.elaborate.mt_level; default this release to off and
+@@ -74,6 +75,29 @@
+     tb_axis_maxpool
+     tb_axis_add
+     tb_matmul_bias_feeder
++    tb_case_0_0
++    tb_case_0_1
++    tb_case_1_0
++    tb_case_1_1
++    tb_case_2_0
++    tb_case_2_1
++    tb_case_3_0
++    tb_case_3_1
++    tb_case_4_0
++    tb_case_4_1
++    tb_case_5_0
++    tb_case_5_1
++    tb_case_6_0
++    tb_case_6_1
++    tb_case_7_0
++    tb_case_7_1
++    tb_case_8_0
++    tb_case_8_1
++    tb_case_9_0
++    tb_case_9_1
++    tb_control_wstrb
++    tb_dma_continuous
++    tb_postprocess_pipe_equivalence
+ }
+ 
+ set pass_count 0
+--- a/scripts/third_five_pass_audit.py
++++ b/scripts/third_five_pass_audit.py
+@@ -8,7 +8,7 @@
+ def txt(r): return (root/r).read_text(errors='replace')
+ 
+ # P1 reset / clock / CDC
+-prod=['npu_bd_top.v','npu_axis_system_top.v','npu_axi_lite_slave.v','npu_regs.v','axis_matmul_feeder.v','matmul_engine.v','matmul_controller.v','systolic_array.v','npu_pe.v','tile_postprocess.v','npu_postprocess.v','axis_tile_output.v','axis_conv_adapter.v','conv_stream_job_engine.v','conv2d_stream_engine.v','axis_maxpool2x2_engine.v','axis_elementwise_add_engine.v']
++prod=['npu_bd_top.v','npu_axis_system_top.v','npu_axi_lite_slave.v','npu_regs.v','axis_matmul_feeder.v','matmul_engine.v','matmul_controller.v','systolic_array.v','npu_pe.v','tile_postprocess.v','npu_postprocess.v','npu_postprocess_pipe.v','axis_tile_output.v','axis_conv_adapter.v','conv_stream_job_engine.v','conv2d_stream_engine.v','axis_maxpool2x2_engine.v','axis_elementwise_add_engine.v']
+ ptext='\n'.join(txt('rtl/'+x) for x in prod)
+ clocks=set(re.findall(r'input\s+(?:wire\s+)?(?:\[[^\]]+\]\s+)?([A-Za-z_][A-Za-z0-9_]*(?:clk|aclk))\b',ptext,re.I))
+ add(not re.search(r'always\s*@\s*\([^\)]*(?:posedge|negedge)\s+(?!clk\b|aclk\b)',ptext),'P1 production sequential logic uses declared synchronous clocks')
+@@ -78,7 +78,7 @@
+ add('create_clock -period 10.000 -name aclk' in vt,'P5 core synthesis has real 100 MHz timing constraint')
+ add('get_timing_paths' in build and 'Final implementation fails setup timing' in build and 'Final implementation fails hold timing' in build,'P5 full implementation hard-fails negative setup/hold slack')
+ add('preset.xml' in fetch and 'presets.xml' not in fetch,'P5 EBAZ board-support filename matches actual repository')
+-add('SIM SUMMARY: PASS=28 FAIL=0' in final and 'RUN_SYNTH=1 RUN_IMPL=1' in final,'P5 canonical build gates XSim before full implementation')
++add('SIM SUMMARY: PASS=51 FAIL=0' in final and 'RUN_SYNTH=1 RUN_IMPL=1' in final,'P5 canonical build gates XSim before full implementation')
+ 
+ fails=[x for x in checks if not x[0]]
+ print(f"THIRD_FIVE_PASS_AUDIT {'PASS' if not fails else 'FAIL'}: {len(checks)-len(fails)}/{len(checks)} checks")
+--- a/sim/tb_conv_stream.v
++++ b/sim/tb_conv_stream.v
+@@ -5,5 +5,5 @@
+  .bias(32'sd0),.relu_en(1'b0),.qmul(32'sd1),.qshift(6'd0),.zero_point(8'sd0),.sample_ready(ready),.out_data(out),.out_valid(ov),.busy(busy),.done(done));
+ always #5 clk=~clk;
+ initial begin #12;rst=0;@(negedge clk);start=1;valid=1;a=2;w=3;last=0;@(negedge clk);start=0;a=4;w=5;last=1;
+- @(negedge clk);valid=0;last=0;#2;if(out!==26) $display("FAIL CONV %0d",out); else $display("PASS CONV");$finish;end
++ @(negedge clk);valid=0;last=0;wait(ov);#1;if(out!==26) $display("FAIL CONV %0d",out); else $display("PASS CONV");$finish;end
+ endmodule
+--- a/sw/linux/npu_uio.c
++++ b/sw/linux/npu_uio.c
+@@ -46,7 +46,7 @@
+     printf("NPU hw version=0x%08x caps=0x%08x ctrl=0x%08x last_job_cycles=%u\n",
+            rd(REG_VERSION), rd(REG_CAPS), ctrl, rd(REG_LASTJOB));
+     printf("status: busy=%u done=%u cfg_error=%u irq_pending=%u\n",
+-           (ctrl>>3)&1u, (ctrl>>1)&1u, (ctrl>>2)&1u, (ctrl>>4)&1u);
++           ctrl&1u, (ctrl>>1)&1u, (ctrl>>2)&1u, (ctrl>>3)&1u);
+ 
+     /* Safe diagnostic by default: never START a datapath without DMA armed. */
+     if (do_abort) {

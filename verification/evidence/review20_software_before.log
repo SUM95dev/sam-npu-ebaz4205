@@ -1,0 +1,133 @@
+.FF..FFFFFFFF..F
+======================================================================
+FAIL: test_conv_geometry (__main__.Tests.test_conv_geometry)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 39, in test_conv_geometry
+    self.reject(self.inspect_blob,b)
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 16, in reject
+    with self.assertRaises((ValueError,TypeError,OverflowError)):fn(*args)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'ValueError'>, <class 'TypeError'>, <class 'OverflowError'>) not raised
+
+======================================================================
+FAIL: test_empty_model (__main__.Tests.test_empty_model)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 34, in test_empty_model
+    def test_empty_model(self):self.reject(self.inspect_blob,b'SNPU'+struct.pack('<HH',2,0))
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 16, in reject
+    with self.assertRaises((ValueError,TypeError,OverflowError)):fn(*args)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'ValueError'>, <class 'TypeError'>, <class 'OverflowError'>) not raised
+
+======================================================================
+FAIL: test_integer_fidelity (__main__.Tests.test_integer_fidelity) (fn='require_i8', bad=1.5)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 22, in test_integer_fidelity
+    with self.subTest(fn=fn.__name__,bad=bad):self.reject(fn,bad)
+                                              ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 16, in reject
+    with self.assertRaises((ValueError,TypeError,OverflowError)):fn(*args)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'ValueError'>, <class 'TypeError'>, <class 'OverflowError'>) not raised
+
+======================================================================
+FAIL: test_integer_fidelity (__main__.Tests.test_integer_fidelity) (fn='require_i32', bad=1.5)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 22, in test_integer_fidelity
+    with self.subTest(fn=fn.__name__,bad=bad):self.reject(fn,bad)
+                                              ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 16, in reject
+    with self.assertRaises((ValueError,TypeError,OverflowError)):fn(*args)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'ValueError'>, <class 'TypeError'>, <class 'OverflowError'>) not raised
+
+======================================================================
+FAIL: test_integer_fidelity (__main__.Tests.test_integer_fidelity) (fn='i8', bad=1.5)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 22, in test_integer_fidelity
+    with self.subTest(fn=fn.__name__,bad=bad):self.reject(fn,bad)
+                                              ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 16, in reject
+    with self.assertRaises((ValueError,TypeError,OverflowError)):fn(*args)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'ValueError'>, <class 'TypeError'>, <class 'OverflowError'>) not raised
+
+======================================================================
+FAIL: test_integer_fidelity (__main__.Tests.test_integer_fidelity) (fn='i32', bad=1.5)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 22, in test_integer_fidelity
+    with self.subTest(fn=fn.__name__,bad=bad):self.reject(fn,bad)
+                                              ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 16, in reject
+    with self.assertRaises((ValueError,TypeError,OverflowError)):fn(*args)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'ValueError'>, <class 'TypeError'>, <class 'OverflowError'>) not raised
+
+======================================================================
+FAIL: test_integer_fidelity (__main__.Tests.test_integer_fidelity) (fn='as_i8', bad=1.5)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 22, in test_integer_fidelity
+    with self.subTest(fn=fn.__name__,bad=bad):self.reject(fn,bad)
+                                              ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 16, in reject
+    with self.assertRaises((ValueError,TypeError,OverflowError)):fn(*args)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'ValueError'>, <class 'TypeError'>, <class 'OverflowError'>) not raised
+
+======================================================================
+FAIL: test_integer_fidelity (__main__.Tests.test_integer_fidelity) (fn='as_i32', bad=1.5)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 22, in test_integer_fidelity
+    with self.subTest(fn=fn.__name__,bad=bad):self.reject(fn,bad)
+                                              ^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 16, in reject
+    with self.assertRaises((ValueError,TypeError,OverflowError)):fn(*args)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'ValueError'>, <class 'TypeError'>, <class 'OverflowError'>) not raised
+
+======================================================================
+FAIL: test_integer_fidelity (__main__.Tests.test_integer_fidelity)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 23, in test_integer_fidelity
+    self.reject(model.as_i8,[bad],'w');self.reject(model.as_i32,[bad],'b');self.reject(model.require_u16,bad,'M')
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 16, in reject
+    with self.assertRaises((ValueError,TypeError,OverflowError)):fn(*args)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'ValueError'>, <class 'TypeError'>, <class 'OverflowError'>) not raised
+
+======================================================================
+FAIL: test_reply_size (__main__.Tests.test_reply_size)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 50, in test_reply_size
+    with self.assertRaisesRegex(RuntimeError,'unexpected reply size'):s.request(op,out_bytes=4)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_zero_matmul (__main__.Tests.test_zero_matmul)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 35, in test_zero_matmul
+    def test_zero_matmul(self):self.reject(self.inspect_blob,b'SNPU'+struct.pack('<HHBHHHII',2,1,1,0,0,0,0,0))
+                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_20ROUND_REVIEW/verification/review20/test_software.py", line 16, in reject
+    with self.assertRaises((ValueError,TypeError,OverflowError)):fn(*args)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: (<class 'ValueError'>, <class 'TypeError'>, <class 'OverflowError'>) not raised
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.008s
+
+FAILED (failures=11)

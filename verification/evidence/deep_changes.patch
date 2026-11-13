@@ -1,0 +1,908 @@
+--- 20round/rtl/conv2d_memory_top.v
++++ deep/rtl/conv2d_memory_top.v
+@@ -42,13 +42,14 @@
+     reg input_req_sent,weight_req_sent,bias_req_sent;
+     reg sample_fire;
+     reg finishing;
++    reg awaiting_output;
+     reg [ADDR_W-1:0] output_addr_hold;
+     wire sample_ready;
+     wire signed [DATA_W-1:0] conv_out;
+     wire conv_out_valid,conv_busy,conv_done;
+ 
+     conv2d_scheduler sched(
+-        .clk(clk),.rst(rst),.start(start),
++        .clk(clk),.rst(rst),.start(start && !busy),
+         .in_h(in_h),.in_w(in_w),.in_c(in_c),.out_c(out_c),
+         .k_h(k_h),.k_w(k_w),.stride_h(stride_h),.stride_w(stride_w),.pad_h(pad_h),.pad_w(pad_w),
+         .sample_accepted(sample_fire),
+@@ -93,7 +94,7 @@
+             input_hold<=0;weight_hold<=0;bias_hold<=0;
+             input_loaded<=0;weight_loaded<=0;bias_loaded<=0;
+             input_req_sent<=0;weight_req_sent<=0;bias_req_sent<=0;
+-            sample_fire<=0; finishing<=0; output_addr_hold<=0;
++            sample_fire<=0; finishing<=0; awaiting_output<=0; output_addr_hold<=0;
+             wr_output_addr<=0;wr_output_data<=0;wr_output_valid<=0;done<=0;
+         end else begin
+             sample_fire<=0;
+@@ -117,13 +118,15 @@
+                 bias_hold<=rd_bias_data; bias_loaded<=1; bias_req_sent<=0;
+             end
+ 
+-            if(sched_busy && sample_ready &&
++            if(sched_busy && !sample_fire && !awaiting_output &&
++               (sample_ready || (first_sample && !conv_busy)) &&
+                (!inside || input_loaded) && weight_loaded &&
+                (!first_sample || bias_loaded) && !wr_output_valid) begin
+                 sample_fire<=1;
+                 input_loaded<=0; input_req_sent<=0;
+                 weight_loaded<=0; weight_req_sent<=0;
+                 if(last_sample) begin
++                    awaiting_output<=1;
+                     output_addr_hold<=output_addr_i;
+                     bias_loaded<=0; bias_req_sent<=0;
+                 end
+@@ -139,6 +142,7 @@
+             end
+ 
+             if(wr_output_valid && wr_output_ready) begin
++                awaiting_output<=0;
+                 wr_output_valid<=0;
+                 if(finishing && !sched_busy && !conv_busy) begin
+                     finishing<=0;
+--- 20round/rtl/conv_stream_job_engine.v
++++ deep/rtl/conv_stream_job_engine.v
+@@ -39,12 +39,14 @@
+     // output arrives. This gives the one-entry output buffer an unambiguous handoff.
+     // The final input ends the job even while its result is still in flight.
+     // Fence following input until completion and a fresh START.
+-    assign sample_ready = job_active && !final_output_pending && !(out_valid && out_last) &&
+-                          !core_out_valid && (!core_busy || core_ready) &&
+-                          (!last_sample || output_space);
++    wire job_accept_enable = job_active && !final_output_pending && !(out_valid && out_last) &&
++                             !core_out_valid && (!last_sample || output_space);
++    assign sample_ready = job_accept_enable && (!core_busy || core_ready);
+     wire fire = sample_valid && sample_ready;
+-    // core_start is true only for the first accepted sample of each output scalar.
+-    wire core_start = fire && !core_busy;
++    // When idle, the core starts directly from the offered sample and available
++    // output slot. Do not derive START from READY: core READY itself depends on
++    // START for its first sample, which otherwise creates a combinational loop.
++    wire core_start = sample_valid && job_accept_enable && !core_busy;
+ 
+     conv2d_stream_engine #(.DATA_W(DATA_W),.ACC_W(ACC_W)) core(
+         .clk(clk),.rst(rst),.start(core_start),.sample_valid(fire),
+--- 20round/sw/linux/npu_dma_proxy.c
++++ deep/sw/linux/npu_dma_proxy.c
+@@ -26,6 +26,8 @@
+ #include <linux/uaccess.h>
+ #include <linux/completion.h>
+ #include <linux/mutex.h>
++#include <linux/kref.h>
++#include <linux/slab.h>
+ 
+ #define BUF_BYTES (4*1024*1024)
+ #define NPU_DMA_IOC_MAGIC 'N'
+@@ -40,6 +42,12 @@
+ 
+ struct npu_dma {
+     struct device *dev;
++    struct device *tx_dev, *rx_dev;
++    struct kref refs;
++    struct mutex tx_op_lock, rx_op_lock;
++    bool removed;
++    bool quarantined;
++    dma_cookie_t tx_cookie, rx_cookie;
+     struct dma_chan *tx;
+     struct dma_chan *rx;
+     void *tx_cpu, *rx_cpu;
+@@ -69,7 +77,7 @@
+     dma_cookie_t cookie;
+     int ret;
+ 
+-    if (!ch || !len || len > BUF_BYTES)
++    if (!ch || !len || len > BUF_BYTES || (len & (tx ? 15u : 3u)))
+         return -EINVAL;
+ 
+     mutex_lock(&d->lock);
+@@ -95,6 +103,8 @@
+         return ret;
+     }
+ 
++    if (tx) d->tx_cookie = cookie;
++    else d->rx_cookie = cookie;
+     *pending = true;
+     dma_async_issue_pending(ch);
+     mutex_unlock(&d->lock);
+@@ -116,10 +126,16 @@
+     mutex_unlock(&d->lock);
+ 
+     if (!wait_for_completion_timeout(done, msecs_to_jiffies(5000))) {
+-        dmaengine_terminate_sync(ch);
++        ret = dmaengine_terminate_sync(ch);
++        if (ret) return ret; /* Keep pending: reuse is unsafe until cancellation succeeds. */
+         ret = -ETIMEDOUT;
+     }
+ 
++    if (!ret && dma_async_is_tx_complete(ch, tx ? d->tx_cookie : d->rx_cookie, NULL, NULL) != DMA_COMPLETE) {
++        ret = dmaengine_terminate_sync(ch);
++        if (ret) return ret;
++        ret = -EIO;
++    }
+     mutex_lock(&d->lock);
+     *pending = false;
+     mutex_unlock(&d->lock);
+@@ -132,6 +148,7 @@
+     struct dma_chan *ch = tx ? d->tx : d->rx;
+     bool *pending = tx ? &d->tx_pending : &d->rx_pending;
+     int ret = dmaengine_terminate_sync(ch);
++    if (ret) return ret;
+     mutex_lock(&d->lock);
+     *pending = false;
+     mutex_unlock(&d->lock);
+@@ -146,7 +163,7 @@
+     return wait_one(d, tx);
+ }
+ 
+-static long npu_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
++static long npu_ioctl_locked(struct file *f, unsigned int cmd, unsigned long arg)
+ {
+     struct miscdevice *m = f->private_data;
+     struct npu_dma *d = container_of(m, struct npu_dma, misc);
+@@ -177,6 +194,29 @@
+     }
+ }
+ 
++/* Serialize an entire operation per direction. In particular WAIT must not
++ * clear a newer START's pending flag after a concurrent CANCEL. TX and RX
++ * retain independent locks, so full duplex submission is still possible.
++ * A same-direction CANCEL waits for WAIT's bounded five-second timeout. */
++static long npu_ioctl(struct file *f, unsigned int cmd, unsigned long arg)
++{
++    struct miscdevice *m = f->private_data;
++    struct npu_dma *d = container_of(m, struct npu_dma, misc);
++    struct mutex *op;
++    long ret;
++    switch (cmd) {
++    case NPU_DMA_TX: case NPU_DMA_TX_START: case NPU_DMA_TX_WAIT: case NPU_DMA_TX_CANCEL:
++        op = &d->tx_op_lock; break;
++    case NPU_DMA_RX: case NPU_DMA_RX_START: case NPU_DMA_RX_WAIT: case NPU_DMA_RX_CANCEL:
++        op = &d->rx_op_lock; break;
++    default: return -ENOTTY;
++    }
++    mutex_lock(op);
++    ret = READ_ONCE(d->removed) ? -ENODEV : npu_ioctl_locked(f, cmd, arg);
++    mutex_unlock(op);
++    return ret;
++}
++
+ static int npu_mmap(struct file *f, struct vm_area_struct *vma)
+ {
+     struct miscdevice *m = f->private_data;
+@@ -184,10 +224,11 @@
+     unsigned long off = vma->vm_pgoff << PAGE_SHIFT;
+     size_t len = vma->vm_end - vma->vm_start;
+ 
++    if (READ_ONCE(d->removed)) return -ENODEV;
+     if (len > BUF_BYTES)
+         return -EINVAL;
+     if (off == 0)
+-        return dma_mmap_coherent(d->dev, vma, d->tx_cpu, d->tx_dma, BUF_BYTES);
++        return dma_mmap_coherent(d->tx_dev, vma, d->tx_cpu, d->tx_dma, BUF_BYTES);
+     if (off == BUF_BYTES) {
+         /* The userspace offset selects the RX allocation; it is not an offset
+          * within that allocation. dma_mmap_coherent() interprets vm_pgoff as
+@@ -195,7 +236,7 @@
+         unsigned long saved_pgoff = vma->vm_pgoff;
+         int ret;
+         vma->vm_pgoff = 0;
+-        ret = dma_mmap_coherent(d->dev, vma, d->rx_cpu, d->rx_dma, BUF_BYTES);
++        ret = dma_mmap_coherent(d->rx_dev, vma, d->rx_cpu, d->rx_dma, BUF_BYTES);
+         vma->vm_pgoff = saved_pgoff;
+         return ret;
+     }
+@@ -210,30 +251,73 @@
+     int ret = 0;
+ 
+     mutex_lock(&d->lock);
+-    if (d->opened)
++    if (READ_ONCE(d->removed))
++        ret = -ENODEV;
++    else if (d->opened)
+         ret = -EBUSY;
+-    else
++    else {
++        kref_get(&d->refs);
+         d->opened = true;
++    }
+     mutex_unlock(&d->lock);
+     return ret;
++}
++
++/* The platform owns one reference and an open file owns another. VMAs keep
++ * that file alive through close(fd), fork and unbind. Never free coherent
++ * buffers or callback storage just because platform remove was called. */
++static void npu_destroy(struct kref *ref)
++{
++    struct npu_dma *d = container_of(ref, struct npu_dma, refs);
++    dma_free_coherent(d->tx_dev, BUF_BYTES, d->tx_cpu, d->tx_dma);
++    dma_free_coherent(d->rx_dev, BUF_BYTES, d->rx_cpu, d->rx_dma);
++    dma_release_channel(d->tx);
++    dma_release_channel(d->rx);
++    put_device(d->tx_dev);
++    put_device(d->rx_dev);
++    put_device(d->dev);
++    kfree(d);
++}
++
++/* A DMA provider that cannot stop a channel must never get its buffers back.
++ * Keep one permanent object/module reference on this exceptional path. A board
++ * reboot is required; leaking quarantined allocations is preferable to DMA
++ * writing into freed memory or running a callback from an unloaded module. */
++static void npu_quarantine(struct npu_dma *d)
++{
++    if (!d->quarantined) {
++        d->quarantined = true;
++        WRITE_ONCE(d->removed, true);
++        kref_get(&d->refs);
++        __module_get(THIS_MODULE);
++        dev_err(d->dev, "DMA cancellation failed; device quarantined until reboot\n");
++    }
+ }
+ 
+ static int npu_release(struct inode *inode, struct file *f)
+ {
+     struct miscdevice *m = f->private_data;
+     struct npu_dma *d = container_of(m, struct npu_dma, misc);
++
++    int tx_ret, rx_ret;
+ 
+     /* A userspace crash/close must not leave an AXI-DMA descriptor pending,
+      * otherwise the next owner would see EBUSY forever.  The device is
+      * intentionally single-owner, so terminating both channels is safe here. */
+-    dmaengine_terminate_sync(d->tx);
+-    dmaengine_terminate_sync(d->rx);
+-    mutex_lock(&d->lock);
+-    d->tx_pending = false;
+-    d->rx_pending = false;
++    mutex_lock(&d->tx_op_lock);
++    mutex_lock(&d->rx_op_lock);
++    tx_ret = dmaengine_terminate_sync(d->tx);
++    rx_ret = dmaengine_terminate_sync(d->rx);
++    if (tx_ret || rx_ret) npu_quarantine(d);
++    mutex_lock(&d->lock);
++    d->tx_pending = tx_ret != 0;
++    d->rx_pending = rx_ret != 0;
+     d->opened = false;
+     mutex_unlock(&d->lock);
+-    return 0;
++    mutex_unlock(&d->rx_op_lock);
++    mutex_unlock(&d->tx_op_lock);
++    kref_put(&d->refs, npu_destroy);
++    return tx_ret ? tx_ret : rx_ret;
+ }
+ 
+ static const struct file_operations fops = {
+@@ -249,26 +333,33 @@
+     struct npu_dma *d;
+     int ret;
+ 
+-    d = devm_kzalloc(&pdev->dev, sizeof(*d), GFP_KERNEL);
++    d = kzalloc(sizeof(*d), GFP_KERNEL);
+     if (!d)
+         return -ENOMEM;
+-    d->dev = &pdev->dev;
++    d->dev = get_device(&pdev->dev);
++    kref_init(&d->refs);
++    mutex_init(&d->tx_op_lock);
++    mutex_init(&d->rx_op_lock);
+     init_completion(&d->tx_done);
+     init_completion(&d->rx_done);
+     mutex_init(&d->lock);
+ 
+     d->tx = dma_request_chan(&pdev->dev, "tx");
+-    if (IS_ERR(d->tx))
+-        return PTR_ERR(d->tx);
++    if (IS_ERR(d->tx)) {
++        ret = PTR_ERR(d->tx);
++        goto err_struct;
++    }
+     d->rx = dma_request_chan(&pdev->dev, "rx");
+     if (IS_ERR(d->rx)) {
+         ret = PTR_ERR(d->rx);
+         dma_release_channel(d->tx);
+-        return ret;
+-    }
+-
+-    d->tx_cpu = dma_alloc_coherent(&pdev->dev, BUF_BYTES, &d->tx_dma, GFP_KERNEL);
+-    d->rx_cpu = dma_alloc_coherent(&pdev->dev, BUF_BYTES, &d->rx_dma, GFP_KERNEL);
++        goto err_struct;
++    }
++    d->tx_dev = get_device(dmaengine_get_dma_device(d->tx));
++    d->rx_dev = get_device(dmaengine_get_dma_device(d->rx));
++
++    d->tx_cpu = dma_alloc_coherent(d->tx_dev, BUF_BYTES, &d->tx_dma, GFP_KERNEL);
++    d->rx_cpu = dma_alloc_coherent(d->rx_dev, BUF_BYTES, &d->rx_dma, GFP_KERNEL);
+     if (!d->tx_cpu || !d->rx_cpu) {
+         ret = -ENOMEM;
+         goto err_dma;
+@@ -289,24 +380,37 @@
+ 
+ err_dma:
+     if (d->tx_cpu)
+-        dma_free_coherent(&pdev->dev, BUF_BYTES, d->tx_cpu, d->tx_dma);
++        dma_free_coherent(d->tx_dev, BUF_BYTES, d->tx_cpu, d->tx_dma);
+     if (d->rx_cpu)
+-        dma_free_coherent(&pdev->dev, BUF_BYTES, d->rx_cpu, d->rx_dma);
++        dma_free_coherent(d->rx_dev, BUF_BYTES, d->rx_cpu, d->rx_dma);
+     dma_release_channel(d->tx);
+     dma_release_channel(d->rx);
++    put_device(d->tx_dev);
++    put_device(d->rx_dev);
++err_struct:
++    put_device(d->dev);
++    kfree(d);
+     return ret;
+ }
+ 
+ static void npu_remove_common(struct platform_device *pdev)
+ {
+     struct npu_dma *d = platform_get_drvdata(pdev);
++    /* misc_deregister synchronizes with misc_open; do it before dropping the
++     * platform reference. Existing files remain valid but cannot submit work. */
++    WRITE_ONCE(d->removed, true);
+     misc_deregister(&d->misc);
+-    dmaengine_terminate_sync(d->tx);
+-    dmaengine_terminate_sync(d->rx);
+-    dma_free_coherent(&pdev->dev, BUF_BYTES, d->tx_cpu, d->tx_dma);
+-    dma_free_coherent(&pdev->dev, BUF_BYTES, d->rx_cpu, d->rx_dma);
+-    dma_release_channel(d->tx);
+-    dma_release_channel(d->rx);
++    mutex_lock(&d->tx_op_lock);
++    mutex_lock(&d->rx_op_lock);
++    /* No owner/pending transfer means release already synchronized callbacks. */
++    if (d->tx_pending || d->rx_pending) {
++        int tx_ret = dmaengine_terminate_sync(d->tx);
++        int rx_ret = dmaengine_terminate_sync(d->rx);
++        if (tx_ret || rx_ret) npu_quarantine(d);
++    }
++    mutex_unlock(&d->rx_op_lock);
++    mutex_unlock(&d->tx_op_lock);
++    kref_put(&d->refs, npu_destroy);
+ }
+ 
+ /* platform_driver::remove changed from int to void in modern kernels.
+--- 20round/sw/onnx_to_snpu.py
++++ deep/sw/onnx_to_snpu.py
+@@ -98,7 +98,7 @@
+         elif op=="MaxPool":
+             check_spatial_attrs(op,a)
+             if len(node.output)>1: raise SystemExit("MaxPool indices output is unsupported")
+-            k=a.get("kernel_shape",[2,2]); s=a.get("strides",[2,2]); pads=a.get("pads",[0,0,0,0])
++            k=a.get("kernel_shape",[2,2]); s=a.get("strides",[1,1]); pads=a.get("pads",[0,0,0,0])
+             if k != [2,2] or s != [2,2] or pads != [0,0,0,0]:
+                 raise SystemExit("Only MaxPool 2x2 stride2 without padding supported in hardware mode")
+             layers.append({"type":"maxpool2"})
+--- 20round/scripts/build_ebaz4205_final.sh
++++ deep/scripts/build_ebaz4205_final.sh
+@@ -22,10 +22,10 @@
+ fi
+ 
+ if [[ "$RUN_XSIM" == "1" ]]; then
+-  echo "=== 52-TEST XSIM + CORE SYNTHESIS ==="
++  echo "=== 55-TEST XSIM + CORE SYNTHESIS ==="
+   "$VIVADO" -mode batch -source scripts/run_vivado_verification.tcl | tee full_verify.log
+-  grep -q 'SIM SUMMARY: PASS=52 FAIL=0' full_verify.log || {
+-    echo "ERROR: strict 52/52 XSim gate not observed" >&2; exit 4;
++  grep -q 'SIM SUMMARY: PASS=55 FAIL=0' full_verify.log || {
++    echo "ERROR: strict 55/55 XSim gate not observed" >&2; exit 4;
+   }
+ fi
+ 
+--- 20round/scripts/create_ebaz4205_full_bd.tcl
++++ deep/scripts/create_ebaz4205_full_bd.tcl
+@@ -120,6 +120,7 @@
+ set dma [create_bd_cell -type ip -vlnv xilinx.com:ip:axi_dma:7.1 axi_dma_0]
+ set_property -dict [list \
+     CONFIG.c_include_sg {0} \
++    CONFIG.c_sg_length_width {23} \
+     CONFIG.c_include_mm2s {1} \
+     CONFIG.c_include_s2mm {1} \
+     CONFIG.c_m_axis_mm2s_tdata_width {128} \
+@@ -138,6 +139,8 @@
+ 
+ # Reset synchronizer.
+ set rst0 [create_bd_cell -type ip -vlnv xilinx.com:ip:proc_sys_reset:5.0 rst_fclk0]
++# PS FCLK_RESET0_N is active-low; do not depend on IP defaults/propagation.
++set_property CONFIG.C_EXT_RESET_HIGH {0} $rst0
+ set locked [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconstant:1.1 const_locked]
+ set_property -dict [list CONFIG.CONST_WIDTH {1} CONFIG.CONST_VAL {1}] $locked
+ 
+@@ -181,8 +184,8 @@
+     connect_bd_net $inter_rstn [get_bd_pins $p]
+ }
+ 
+-# Optional DMA interrupts. If IRQ_F2P is available/enabled, connect both.
+-catch {
++# Linux DMAengine requires completion interrupts for both directions.
++if {[catch {
+     set_property -dict [list CONFIG.PCW_USE_FABRIC_INTERRUPT {1} CONFIG.PCW_IRQ_F2P_INTR {1}] $ps7
+     set irqcat [create_bd_cell -type ip -vlnv xilinx.com:ip:xlconcat:2.1 dma_irq_concat]
+     set_property -dict [list CONFIG.NUM_PORTS {3}] $irqcat
+@@ -190,8 +193,9 @@
+     connect_bd_net [get_bd_pins axi_dma_0/s2mm_introut] [get_bd_pins dma_irq_concat/In1]
+     connect_bd_net [get_bd_pins npu_0/irq] [get_bd_pins dma_irq_concat/In2]
+     connect_bd_net [get_bd_pins dma_irq_concat/dout] [get_bd_pins ps7_0/IRQ_F2P]
+-} irq_msg
+-if {$irq_msg ne ""} { puts "INFO: DMA IRQ optional-connect result: $irq_msg" }
++} irq_msg]} {
++    error "Required DMA/NPU interrupt wiring failed: $irq_msg"
++}
+ 
+ # Deterministic control-map addresses.  Keep NPU control small (64 KiB) instead
+ # of allowing IP Integrator to infer a huge 512 MiB/2 GiB window from the
+--- 20round/scripts/create_zynq_dma_bd.tcl
++++ deep/scripts/create_zynq_dma_bd.tcl
+@@ -10,6 +10,7 @@
+ 
+ set_property -dict [list \
+   CONFIG.c_include_sg {0} \
++    CONFIG.c_sg_length_width {23} \
+   CONFIG.c_sg_include_stscntrl_strm {0} \
+   CONFIG.c_m_axis_mm2s_tdata_width {128} \
+   CONFIG.c_s_axis_s2mm_tdata_width {32} \
+--- 20round/scripts/final_release_audit.py
++++ deep/scripts/final_release_audit.py
+@@ -28,7 +28,7 @@
+ ck('NPU IRQ wired into PS concat','CONFIG.NUM_PORTS {3}' in bd and 'npu_0/irq' in bd)
+ 
+ vt=(ROOT/'scripts/run_vivado_verification.tcl').read_text(); tbs=list((ROOT/'sim').glob('tb_*.v'))+list((ROOT/'verification/extra').glob('*.v')); listed=set(re.findall(r'^\s+(tb_[A-Za-z0-9_]+)\s*$',vt,re.M))
+-ck('52-test Vivado suite',len(tbs)==52 and listed=={('tb_'+p.stem if p.stem.startswith('case_') else p.stem) for p in tbs},f'files={len(tbs)} listed={len(listed)}')
++ck('55-test Vivado suite',len(tbs)==55 and listed=={('tb_'+p.stem if p.stem.startswith('case_') else p.stem) for p in tbs},f'files={len(tbs)} listed={len(listed)}')
+ ck('new tests have PASS/FAIL',all('PASS' in p.read_text() and 'FAIL' in p.read_text() for p in tbs))
+ 
+ # Compile every Python file in-process. This checks syntax without creating
+--- 20round/scripts/five_more_pass_audit.py
++++ deep/scripts/five_more_pass_audit.py
+@@ -118,7 +118,7 @@
+ tb_files=list((root/'sim').glob('tb_*.v'))+list((root/'verification/extra').glob('*.v'))
+ listed=re.findall(r'(?m)^\s*(tb_[A-Za-z0-9_]+)\s*$',tcl)
+ add((root/'sim/tb_matmul_multitile_order.v').exists() and 'tb_matmul_multitile_order' in listed,'P3 multi-tile hardware-order regression is in XSim suite')
+-add(len(tb_files)==52 and len(set(listed))==52 and set(listed)=={('tb_'+p.stem if p.stem.startswith('case_') else p.stem) for p in tb_files},'P3 strict Vivado suite is exactly 52 existing tests',f'files={len(tb_files)} listed={len(set(listed))}')
++add(len(tb_files)==55 and len(set(listed))==55 and set(listed)=={('tb_'+p.stem if p.stem.startswith('case_') else p.stem) for p in tb_files},'P3 strict Vivado suite is exactly 55 existing tests',f'files={len(tb_files)} listed={len(set(listed))}')
+ add('regexp -line {^FAIL}' in tcl and 'regexp -line {^PASS}' in tcl and 'testbench emitted FAIL' in tcl,'P3 XSim Tcl checks logical PASS/FAIL, not process exit only')
+ 
+ # ---------- Pass 4: software/RTL contract safety ----------
+@@ -158,7 +158,7 @@
+     try: compile(p.read_text(),str(p),'exec')
+     except Exception as e: ok=False; bad.append(f'{p.name}:{e}')
+ add(ok,'P5 all Python sources parse', '; '.join(bad[:3]))
+-add('SIM SUMMARY: PASS=52 FAIL=0' in final and 'RUN_IMPL=1' in final,'P5 canonical build gates 52/52 before implementation')
++add('SIM SUMMARY: PASS=55 FAIL=0' in final and 'RUN_IMPL=1' in final,'P5 canonical build gates 55/55 before implementation')
+ 
+ fails=[x for x in checks if not x[0]]
+ print(f"SECOND_FIVE_PASS_AUDIT {'PASS' if not fails else 'FAIL'}: {len(checks)-len(fails)}/{len(checks)} checks")
+--- 20round/scripts/run_vivado_verification.tcl
++++ deep/scripts/run_vivado_verification.tcl
+@@ -95,6 +95,9 @@
+     tb_case_8_1
+     tb_case_9_0
+     tb_case_9_1
++    tb_axi_lite_random_stalls
++    tb_conv_memory_stall
++    tb_conv_memory_stall_c2
+     tb_conv_final_fence
+     tb_control_wstrb
+     tb_dma_continuous
+--- 20round/scripts/third_five_pass_audit.py
++++ deep/scripts/third_five_pass_audit.py
+@@ -78,7 +78,7 @@
+ add('create_clock -period 10.000 -name aclk' in vt,'P5 core synthesis has real 100 MHz timing constraint')
+ add('get_timing_paths' in build and 'Final implementation fails setup timing' in build and 'Final implementation fails hold timing' in build,'P5 full implementation hard-fails negative setup/hold slack')
+ add('preset.xml' in fetch and 'presets.xml' not in fetch,'P5 EBAZ board-support filename matches actual repository')
+-add('SIM SUMMARY: PASS=52 FAIL=0' in final and 'RUN_SYNTH=1 RUN_IMPL=1' in final,'P5 canonical build gates XSim before full implementation')
++add('SIM SUMMARY: PASS=55 FAIL=0' in final and 'RUN_SYNTH=1 RUN_IMPL=1' in final,'P5 canonical build gates XSim before full implementation')
+ 
+ fails=[x for x in checks if not x[0]]
+ print(f"THIRD_FIVE_PASS_AUDIT {'PASS' if not fails else 'FAIL'}: {len(checks)-len(fails)}/{len(checks)} checks")
+--- 20round/verification/deep/run_checks.py
++++ deep/verification/deep/run_checks.py
+@@ -0,0 +1,11 @@
++#!/usr/bin/env python3
++"""Run additional host checks. --onnx opts into its optional dependencies."""
++import argparse,subprocess,sys
++from pathlib import Path
++p=argparse.ArgumentParser();p.add_argument('--onnx',action='store_true');a=p.parse_args()
++root=Path(__file__).resolve().parents[2]
++for name in ['test_dma_proxy.py','test_server.py','test_bd_contract.py']:
++ subprocess.run([sys.executable,str(root/'verification/deep'/name)],check=True)
++if a.onnx:subprocess.run([sys.executable,str(root/'verification/deep/test_onnx_integration.py')],check=True)
++else:print('ONNX integration SKIPPED (use --onnx with onnx/numpy installed)')
++print('PASS requested additional host checks; no board or Vivado execution implied')
+--- 20round/verification/deep/test_bd_contract.py
++++ deep/verification/deep/test_bd_contract.py
+@@ -0,0 +1,41 @@
++#!/usr/bin/env python3
++"""Execute BD Tcl against API mocks to check explicit settings/error propagation.
++This is not Vivado validation. Set TCLSH to an installed tclsh executable.
++"""
++from pathlib import Path
++import os,subprocess,sys
++root=Path(sys.argv[1]).resolve() if len(sys.argv)>1 else Path(__file__).resolve().parents[2]
++script=r'''
++set configs [dict create]
++set inject 0
++proc get_bd_designs {args} {return {}}
++proc current_project {} {return mock_project}
++proc get_property {args} {return mock:ebaz4205:1.0}
++proc create_bd_cell {args} {return [lindex $args end]}
++proc get_bd_cells {args} {return [lindex $args end]}
++proc get_bd_pins {args} {return [lindex $args end]}
++proc get_bd_intf_pins {args} {return [lindex $args end]}
++proc get_bd_addr_segs {args} {return [lindex $args end]}
++proc set_property {args} {
++ global configs
++ if {[lindex $args 0] eq "-dict"} {
++  dict for {k v} [lindex $args 1] {dict set configs [lindex $args 2] $k $v}
++ } else {dict set configs [lindex $args 2] [lindex $args 0] [lindex $args 1]}
++}
++proc connect_bd_net {args} {
++ global inject
++ if {$inject && [lsearch -exact $args npu_0/irq]>=0} {error "injected missing IRQ pin"}
++}
++proc unknown {args} {return [lindex $args end]}
++source {SOURCE}
++if {![dict exists $configs axi_dma_0 CONFIG.c_sg_length_width] || [dict get $configs axi_dma_0 CONFIG.c_sg_length_width] != 23} {error "FAIL DMA length width not 23"}
++if {![dict exists $configs rst_fclk0 CONFIG.C_EXT_RESET_HIGH] || [dict get $configs rst_fclk0 CONFIG.C_EXT_RESET_HIGH] != 0} {error "FAIL reset polarity not explicit active-low"}
++set inject 1
++if {![catch {source {SOURCE}} msg]} {error "FAIL IRQ connection failure was swallowed"}
++if {![string match {*Required DMA/NPU interrupt wiring failed*} $msg]} {error "FAIL unexpected failure: $msg"}
++puts "PASS BD explicit 23-bit DMA length, active-low reset and required IRQ fail-fast"
++'''.replace('SOURCE',str(root/'scripts/create_ebaz4205_full_bd.tcl'))
++# tclsh stdin may return zero on an uncaught interactive error. Use a file.
++import tempfile
++with tempfile.NamedTemporaryFile(mode='w',suffix='.tcl') as f:
++ f.write(script);f.flush();subprocess.run([os.environ.get('TCLSH','tclsh'),f.name],check=True)
+--- 20round/verification/deep/test_dma_proxy.py
++++ deep/verification/deep/test_dma_proxy.py
+@@ -0,0 +1,138 @@
++#!/usr/bin/env python3
++"""Execute actual DMA proxy functions with pthread-backed kernel/API mocks.
++Not a loaded-kernel or physical DMA test. Optional argument: source tree.
++"""
++from pathlib import Path
++import subprocess,tempfile,sys,os
++root=Path(sys.argv[1]).resolve() if len(sys.argv)>1 else Path(__file__).resolve().parents[2]
++s=(root/'sw/linux/npu_dma_proxy.c').read_text()
++def function(name):
++ start=s.index('static ',s.index('\n',s.index(' '+name+'(')-20)) if False else 0
++ import re
++ m=re.search(r'static [\w *]+\b'+name+r'\(',s);start=m.start();op=s.index('{',m.end());depth=1;i=op+1
++ while depth:
++  depth+=(s[i]=='{')-(s[i]=='}');i+=1
++ return s[start:i]+'\n'
++prefix=r'''
++#define _DEFAULT_SOURCE
++#include <assert.h>
++#include <errno.h>
++#include <stdbool.h>
++#include <stdint.h>
++#include <stddef.h>
++#include <stdlib.h>
++#include <string.h>
++#include <stdio.h>
++#include <pthread.h>
++#include <stdatomic.h>
++#include <unistd.h>
++#include <time.h>
++#include <sys/ioctl.h>
++#define __user
++#define READ_ONCE(x) __atomic_load_n(&(x),__ATOMIC_ACQUIRE)
++#define WRITE_ONCE(x,v) __atomic_store_n(&(x),(v),__ATOMIC_RELEASE)
++#define container_of(ptr,type,member) ((type*)((char*)(ptr)-offsetof(type,member)))
++#define DMA_PREP_INTERRUPT 1
++#define DMA_CTRL_ACK 2
++#define msecs_to_jiffies(x) (x)
++#define ENOTSUPP EOPNOTSUPP
++typedef uintptr_t dma_addr_t;
++typedef int dma_cookie_t;
++struct mutex {pthread_mutex_t p;};
++static void mutex_init(struct mutex*m){pthread_mutex_init(&m->p,0);}
++static void mutex_lock(struct mutex*m){pthread_mutex_lock(&m->p);}
++static void mutex_unlock(struct mutex*m){pthread_mutex_unlock(&m->p);}
++struct kref {int refs;};
++static void kref_init(struct kref*k){k->refs=1;}
++static void kref_get(struct kref*k){++k->refs;}
++static void kref_put(struct kref*k,void(*fn)(struct kref*)){if(!--k->refs)fn(k);}
++struct device {int refs;};
++static void put_device(struct device*d){--d->refs;}
++struct miscdevice {int unused;};
++struct file {void*private_data;};struct inode {int unused;};
++struct platform_device {void*data;struct device dev;};
++static void* platform_get_drvdata(struct platform_device*p){return p->data;}
++static void misc_deregister(struct miscdevice*m){(void)m;}
++static int freed,terminated,released;
++static void dma_free_coherent(struct device*d,size_t n,void*p,dma_addr_t a){(void)d;(void)n;(void)a;free(p);freed++;}
++#define kfree free
++#define THIS_MODULE NULL
++#define __module_get(m) ((void)(m))
++#define dev_err(...) ((void)0)
++struct completion {pthread_mutex_t m;pthread_cond_t c;int done;};
++static atomic_int waiting;
++static void init_completion(struct completion*d){pthread_mutex_init(&d->m,0);pthread_cond_init(&d->c,0);d->done=0;}
++static void reinit_completion(struct completion*d){d->done=0;}
++static void complete(struct completion*d){pthread_mutex_lock(&d->m);d->done++;pthread_cond_signal(&d->c);pthread_mutex_unlock(&d->m);}
++static int wait_for_completion_timeout(struct completion*d,int timeout){
++ (void)timeout;struct timespec t;clock_gettime(CLOCK_REALTIME,&t);t.tv_nsec+=200000000;if(t.tv_nsec>=1000000000){t.tv_sec++;t.tv_nsec-=1000000000;}
++ pthread_mutex_lock(&d->m);atomic_fetch_add(&waiting,1);
++ while(!d->done){if(pthread_cond_timedwait(&d->c,&d->m,&t)==ETIMEDOUT){pthread_mutex_unlock(&d->m);return 0;}}
++ d->done--;pthread_mutex_unlock(&d->m);return 1;
++}
++enum dma_transfer_direction {DMA_MEM_TO_DEV,DMA_DEV_TO_MEM};
++enum dma_status {DMA_COMPLETE,DMA_IN_PROGRESS,DMA_ERROR};
++struct dma_async_tx_descriptor {void(*callback)(void*);void*callback_param;};
++struct dma_chan {struct dma_async_tx_descriptor desc;int cookie,status,terminate_error;};
++static struct dma_async_tx_descriptor* dmaengine_prep_slave_single(struct dma_chan*c,dma_addr_t a,unsigned n,enum dma_transfer_direction d,int flags){(void)a;(void)n;(void)d;(void)flags;return &c->desc;}
++static dma_cookie_t dmaengine_submit(struct dma_async_tx_descriptor*d){(void)d;return 1;}
++static int dma_submit_error(dma_cookie_t c){return c<0?c:0;}
++static void dma_async_issue_pending(struct dma_chan*c){c->cookie=1;}
++static int dmaengine_terminate_sync(struct dma_chan*c){terminated++;return c->terminate_error;}
++static void dma_release_channel(struct dma_chan*c){(void)c;released++;}
++static enum dma_status dma_async_is_tx_complete(struct dma_chan*c,int cookie,void*a,void*b){(void)a;(void)b;assert(cookie==1);return c->status;}
++static int copy_from_user(void*dst,const void*src,size_t n){memcpy(dst,src,n);return 0;}
++'''
++body=s[s.index('#define BUF_BYTES'):s.index('static int npu_mmap')]
++# Keep function definitions needed for lifecycle, independently of file ordering.
++for name in ['npu_open','npu_destroy','npu_quarantine','npu_release','npu_remove_common']:
++ if ' '+name+'(' in s:body+=function(name)
++modern='struct kref refs;' in s
++setup='mutex_init(&d->tx_op_lock);mutex_init(&d->rx_op_lock);kref_init(&d->refs);d->tx_dev=d->rx_dev=dev;' if modern else ''
++code=r'''
++static struct npu_dma* setup(struct device*dev,struct dma_chan*tx,struct dma_chan*rx){
++ struct npu_dma*d=calloc(1,sizeof(*d));d->dev=dev;d->tx=tx;d->rx=rx;mutex_init(&d->lock);init_completion(&d->tx_done);init_completion(&d->rx_done);
++ SETUP
++ d->tx_cpu=malloc(64);d->rx_cpu=malloc(64);return d;
++}
++struct waiter{struct file*f;long result;};
++static void* run_wait(void*p){struct waiter*w=p;w->result=npu_ioctl(w->f,NPU_DMA_TX_WAIT,0);return 0;}
++int main(void){
++ struct device dev={100};struct dma_chan tx={0},rx={0};struct npu_dma*d=setup(&dev,&tx,&rx);struct file f={&d->misc};struct inode inode={0};unsigned len=16;
++ assert(!npu_open(&inode,&f));assert(npu_open(&inode,&f)==-EBUSY);
++ assert(npu_ioctl(&f,NPU_DMA_TX_WAIT,0)==-EINVAL);
++ assert(!npu_ioctl(&f,NPU_DMA_TX_START,(uintptr_t)&len));
++ assert(npu_ioctl(&f,NPU_DMA_TX_START,(uintptr_t)&len)==-EBUSY);
++ struct waiter w1={&f,999},w2={&f,999};pthread_t t1,t2;
++ pthread_create(&t1,0,run_wait,&w1);while(!atomic_load(&waiting))usleep(1000);
++ pthread_create(&t2,0,run_wait,&w2);usleep(20000);
++ tx.status=DMA_COMPLETE;tx.desc.callback(tx.desc.callback_param);
++ pthread_join(t1,0);pthread_join(t2,0);
++ if(w1.result!=0||w2.result!=-EINVAL){fprintf(stderr,"FAIL concurrent WAIT: %ld %ld (expected 0, %d)\n",w1.result,w2.result,-EINVAL);return 1;}
++ puts("PASS concurrent WAIT serialization");
++ assert(!npu_ioctl(&f,NPU_DMA_TX_START,(uintptr_t)&len));
++ assert(npu_ioctl(&f,NPU_DMA_TX_WAIT,0)==-ETIMEDOUT);assert(!d->tx_pending);
++ assert(!npu_ioctl(&f,NPU_DMA_TX_START,(uintptr_t)&len));tx.terminate_error=-EIO;
++ assert(npu_ioctl(&f,NPU_DMA_TX_CANCEL,0)==-EIO);assert(d->tx_pending);tx.terminate_error=0;assert(!npu_ioctl(&f,NPU_DMA_TX_CANCEL,0));
++ puts("PASS timeout recovery and failed-cancel pending retention");
++ assert(!npu_ioctl(&f,NPU_DMA_TX_START,(uintptr_t)&len));
++ assert(!npu_ioctl(&f,NPU_DMA_RX_START,(uintptr_t)&len));
++ assert(!npu_ioctl(&f,NPU_DMA_RX_CANCEL,0));assert(d->tx_pending);assert(!npu_ioctl(&f,NPU_DMA_TX_CANCEL,0));
++ puts("PASS independent TX/RX operation");
++ struct platform_device pdev={.data=d};npu_remove_common(&pdev);
++ assert(freed==0 && released==0);memset(d->rx_cpu,42,64);
++ assert(npu_ioctl(&f,NPU_DMA_TX_START,(uintptr_t)&len)==-ENODEV);
++ assert(!npu_release(&inode,&f));assert(freed==2&&released==2);
++ puts("PASS remove retains allocations until final file release, removed ioctl rejected");
++ d=setup(&dev,&tx,&rx);f.private_data=&d->misc;assert(!npu_open(&inode,&f));
++ tx.terminate_error=-EIO;assert(npu_release(&inode,&f)==-EIO);assert(d->quarantined&&d->removed);assert(freed==2);
++ pdev.data=d;npu_remove_common(&pdev);assert(freed==2);assert(d->refs.refs==1);
++ puts("PASS failed close cancellation quarantines allocations and rejects reuse");return 0;
++}
++'''.replace('SETUP',setup)
++if not modern:
++ code=code[:code.index(' d=setup(&dev,&tx,&rx);f.private_data')]+"return 0;\n}\n"
++with tempfile.TemporaryDirectory() as t:
++ p=Path(t);(p/'test.c').write_text(prefix+body+code)
++ subprocess.run(['gcc','-std=c11','-Wall','-Wextra','-Wno-unused-function','-Wno-unused-parameter','-pthread','-fsanitize=address,undefined','-g',str(p/'test.c'),'-o',str(p/'test')],check=True)
++ subprocess.run([str(p/'test')],check=True,timeout=10,env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0'))
+--- 20round/verification/deep/test_onnx_integration.py
++++ deep/verification/deep/test_onnx_integration.py
+@@ -0,0 +1,34 @@
++#!/usr/bin/env python3
++"""Real ONNX parser/shape-inference -> converter -> packer smoke/regression tests.
++Requires optional onnx/numpy. This is metadata export, not a full graph executor.
++"""
++import unittest,tempfile,subprocess,sys,json,importlib.util
++from pathlib import Path
++import onnx,numpy as np
++from onnx import helper as h, TensorProto as T, numpy_helper as nh
++root=Path(__file__).resolve().parents[2]
++class Tests(unittest.TestCase):
++ def convert(self,nodes,inputs,outputs,inits=(),ok=True,reason=''):
++  with tempfile.TemporaryDirectory() as t:
++   p=Path(t);m=h.make_model(h.make_graph(nodes,'test',inputs,outputs,list(inits)),opset_imports=[h.make_opsetid('',13)])
++   onnx.save(m,p/'x.onnx');r=subprocess.run([sys.executable,str(root/'sw/onnx_to_snpu.py'),str(p/'x.onnx'),'-o',str(p/'x.json')],capture_output=True,text=True)
++   if not ok:self.assertNotEqual(r.returncode,0);self.assertIn(reason,r.stderr);return
++   self.assertEqual(r.returncode,0,r.stderr);d=json.loads((p/'x.json').read_text())
++   r=subprocess.run([sys.executable,str(root/'sw/model_packer.py'),str(p/'x.json'),'-o',str(p/'x.snpu')],capture_output=True,text=True);self.assertEqual(r.returncode,0,r.stderr)
++   r=subprocess.run([sys.executable,str(root/'sw/snpu_inspect.py'),str(p/'x.snpu')],capture_output=True,text=True);self.assertEqual(r.returncode,0,r.stderr);return d
++ def pool(self,**attrs):
++  return [h.make_node('MaxPool',['x'],['y'],kernel_shape=[2,2],**attrs)],[h.make_tensor_value_info('x',T.INT8,[1,1,4,4])],[h.make_tensor_value_info('y',T.INT8,[1,1,2,2])]
++ def test_matmul_roundtrip(self):
++  d=self.convert([h.make_node('MatMul',['x','w'],['y'])],[h.make_tensor_value_info('x',T.INT8,[2,3])],[h.make_tensor_value_info('y',T.INT8,[2,4])],[nh.from_array(np.arange(12,dtype=np.int8).reshape(3,4),'w')]);self.assertEqual(d['layers'][0]['weights'],list(range(12)))
++ def test_float_weights_rejected(self):
++  self.convert([h.make_node('MatMul',['x','w'],['y'])],[h.make_tensor_value_info('x',T.FLOAT,[2,3])],[h.make_tensor_value_info('y',T.FLOAT,[2,4])],[nh.from_array(np.ones((3,4),dtype=np.float32),'w')],ok=False,reason='will not silently quantize')
++ def test_pool_explicit_stride(self):self.convert(*self.pool(strides=[2,2]))
++ def test_pool_default_stride_rejected(self):self.convert(*self.pool(),ok=False,reason='Only MaxPool 2x2 stride2')
++ def test_pool_autopad_rejected(self):self.convert(*self.pool(strides=[2,2],auto_pad='SAME_UPPER'),ok=False,reason='auto_pad is unsupported')
++ def test_pool_ceil_rejected(self):self.convert(*self.pool(strides=[2,2],ceil_mode=1),ok=False,reason='ceil_mode/storage_order')
++ def test_conv_weight_order(self):
++  w=np.arange(8,dtype=np.int8).reshape(2,1,2,2)
++  d=self.convert([h.make_node('Conv',['x','w'],['y'])],[h.make_tensor_value_info('x',T.INT8,[1,1,3,3])],[h.make_tensor_value_info('y',T.INT8,[1,2,2,2])],[nh.from_array(w,'w')]);self.assertEqual(d['layers'][0]['weights'],np.transpose(w,(0,2,3,1)).reshape(-1).tolist())
++ def test_conv_dynamic_bias_rejected(self):
++  self.convert([h.make_node('Conv',['x','w','b'],['y'])],[h.make_tensor_value_info('x',T.INT8,[1,1,3,3]),h.make_tensor_value_info('b',T.INT32,[1])],[h.make_tensor_value_info('y',T.INT8,[1,1,3,3])],[nh.from_array(np.ones((1,1,1,1),dtype=np.int8),'w')],ok=False,reason='requires constant bias')
++if __name__=='__main__':unittest.main(verbosity=2)
+--- 20round/verification/deep/test_server.py
++++ deep/verification/deep/test_server.py
+@@ -0,0 +1,46 @@
++#!/usr/bin/env python3
++"""Host socketpair tests of actual C server framing/validation, no board/ioctl."""
++from pathlib import Path
++import tempfile,subprocess,os
++root=Path(__file__).resolve().parents[2]
++code=r'''
++#define main npu_server_program_main
++#include "SOURCE"
++#undef main
++#include <assert.h>
++static uint32_t fake_regs[1024];
++static int query(struct req_hdr_wire *h,const void *body,unsigned bytes,int expected){
++ int f[2];uint8_t tx[256],rx[256];assert(!socketpair(AF_UNIX,SOCK_STREAM,0,f));
++ assert(!send_all(f[0],h,sizeof(*h)));if(bytes)assert(!send_all(f[0],body,bytes));
++ int rc=handle_client(f[1],-1,tx,rx);struct rep_hdr_wire rep;assert(!recv_all(f[0],&rep,sizeof(rep)));
++ assert(!memcmp(rep.magic,"SNPR",4));assert(rep.request_id_be==h->request_id_be);assert((int32_t)ntohl(rep.status_be)==expected);
++ if(expected==0){uint32_t info[7];assert(rc==0);assert(ntohl(rep.output_bytes_be)==sizeof(info));assert(!recv_all(f[0],info,sizeof(info)));assert(ntohl(info[0])==0x20000);}
++ else {assert(rc==-1);assert(ntohl(rep.output_bytes_be)==0);}
++ close(f[0]);close(f[1]);return 1;
++}
++static struct req_hdr_wire header(unsigned op,unsigned in,unsigned out){
++ struct req_hdr_wire h={0};memcpy(h.magic,"SNPU",4);h.version_be=htons(1);h.opcode_be=htons(op);h.m_be=h.n_be=h.k_be=htons(1);h.input_bytes_be=htonl(in);h.output_bytes_be=htonl(out);h.request_id_be=htonl(123);h.qmul_be=htonl(1);return h;
++}
++int main(void){
++ regs=fake_regs;fake_regs[REG_CAPS/4]=255;fake_regs[REG_VERSION/4]=0x20000;
++ struct req_hdr_wire h=header(OP_INFO,0,0);int tests=query(&h,0,0,0);
++ h.magic[0]='!';tests+=query(&h,0,0,-10);h=header(99,16,4);tests+=query(&h,0,0,-11);
++ h=header(OP_INFO,16,0);tests+=query(&h,0,0,-11);
++ h=header(OP_ADD,16,4);h.qshift=64;tests+=query(&h,0,0,-11);
++ h=header(OP_CONV,16,4);h.flags_be=htons(FLAG_MATMUL_BIAS);tests+=query(&h,0,0,-11);
++ h=header(OP_MATMUL,16,4);tests+=query(&h,0,0,-12);
++ h=header(OP_MAXPOOL,16,4);tests+=query(&h,0,0,-12);
++ h=header(OP_ADD,32,4);tests+=query(&h,0,0,-12);
++ uint8_t badconv[16]={0};h=header(OP_CONV,16,4);tests+=query(&h,badconv,16,-13);
++ fake_regs[REG_CAPS/4]=0;h=header(OP_ADD,16,4);tests+=query(&h,0,0,-14);
++ unsigned max=131071;uint8_t *payload=calloc(max+1,16);assert(payload);
++ payload[(max-1)*16+2]=1;assert(validate_conv_payload(payload,max*16,4)==0);
++ payload[(max-1)*16+2]=0;payload[max*16+2]=1;assert(validate_conv_payload(payload,(max+1)*16,4)<0);
++ assert(validate_conv_payload(payload,15,4)<0);assert(validate_conv_payload(payload,16,3)<0);free(payload);
++ printf("PASS %d C server socketpair requests, Conv 131071/131072 MAC boundary and malformed lengths\n",tests);return 0;
++}
++'''.replace('SOURCE',str(root/'sw/linux/npu_net_server.c'))
++with tempfile.TemporaryDirectory() as t:
++ p=Path(t);(p/'test.c').write_text(code)
++ subprocess.run(['gcc','-std=c11','-D_DEFAULT_SOURCE','-Wall','-Wextra','-Werror','-fsanitize=address,undefined','-g',str(p/'test.c'),'-o',str(p/'test')],check=True)
++ subprocess.run([str(p/'test')],check=True,timeout=10,env=dict(os.environ,ASAN_OPTIONS='detect_leaks=0'))
+--- 20round/verification/extra/tb_axi_lite_random_stalls.v
++++ deep/verification/extra/tb_axi_lite_random_stalls.v
+@@ -0,0 +1,39 @@
++`timescale 1ns/1ps
++module tb_axi_lite_random_stalls;
++reg clk=0,rstn=0;always #5 clk=~clk;
++reg [5:0] aa=0,ra=0;reg av=0,wv=0,br=0,rv=0,rr=0;reg [31:0] wd=0;reg [3:0] ws=0;
++wire ar,wr,bv,rar,rrv;wire [1:0] bp,rp;wire [31:0] rd;
++wire regwr,regrd;wire [5:0] regwa,regra;wire [31:0] regwd;wire [3:0] regws;reg [31:0] bank[0:15],expected[0:15];
++wire [31:0] regrdata=regrd?bank[regra[5:2]]:32'd0;
++npu_axi_lite_slave dut(.aclk(clk),.aresetn(rstn),.s_axi_awaddr(aa),.s_axi_awvalid(av),.s_axi_awready(ar),
++.s_axi_wdata(wd),.s_axi_wstrb(ws),.s_axi_wvalid(wv),.s_axi_wready(wr),.s_axi_bresp(bp),.s_axi_bvalid(bv),.s_axi_bready(br),
++.s_axi_araddr(ra),.s_axi_arvalid(rv),.s_axi_arready(rar),.s_axi_rdata(rd),.s_axi_rresp(rp),.s_axi_rvalid(rrv),.s_axi_rready(rr),
++.reg_wr(regwr),.reg_waddr(regwa),.reg_wdata(regwd),.reg_wstrb(regws),.reg_rd(regrd),.reg_raddr(regra),.reg_rdata(regrdata));
++integer i,j,n,ad,dd,stall,idx,seed=7231,writes=0;
++always @(posedge clk)if(regwr)begin
++ writes=writes+1;
++ for(j=0;j<4;j=j+1)if(regws[j])bank[regwa[5:2]][j*8+:8]<=regwd[j*8+:8];
++end
++initial begin
++ for(i=0;i<16;i=i+1)begin bank[i]=0;expected[i]=0;end
++ #12;rstn=1;
++ for(n=0;n<300;n=n+1)begin
++  idx=($random(seed)&32'h7fffffff)%16;ad=($random(seed)&7);dd=($random(seed)&7);stall=($random(seed)&7);
++  @(negedge clk);aa=idx*4;wd=$random(seed);ws=$random(seed);
++  for(i=0;i<4;i=i+1)if(ws[i])expected[idx][i*8+:8]=wd[i*8+:8];
++  fork
++   begin repeat(ad)@(negedge clk);av=1;@(posedge clk);while(!ar)@(posedge clk);@(negedge clk);av=0;end
++   begin repeat(dd)@(negedge clk);wv=1;@(posedge clk);while(!wr)@(posedge clk);@(negedge clk);wv=0;end
++  join
++  wait(bv);repeat(stall)begin @(negedge clk);if(!bv||bp!==0)begin $display("FAIL B hold");$finish;end end
++  @(negedge clk);br=1;@(posedge clk);@(negedge clk);br=0;
++  ra=idx*4;rv=1;@(posedge clk);while(!rar)@(posedge clk);@(negedge clk);rv=0;
++  wait(rrv);repeat(stall)begin @(negedge clk);if(!rrv||rd!==expected[idx]||rp!==0)begin $display("FAIL R hold/value txn=%0d got=%h want=%h",n,rd,expected[idx]);$finish;end end
++  if(rd!==expected[idx])begin $display("FAIL readback txn=%0d",n);$finish;end
++  @(negedge clk);rr=1;@(posedge clk);@(negedge clk);rr=0;
++ end
++ if(writes!=300)begin $display("FAIL duplicate/missing writes %0d",writes);$finish;end
++ $display("PASS AXI-Lite 300 random AW/W delays, WSTRB and stalled B/R responses");$finish;
++end
++initial begin #190000;$display("FAIL AXI stress timeout");$finish;end
++endmodule
+--- 20round/verification/extra/tb_conv_memory_stall.v
++++ deep/verification/extra/tb_conv_memory_stall.v
+@@ -0,0 +1,34 @@
++`timescale 1ns/1ps
++module tb_conv_memory_stall;
++reg clk=0,rst=1,start=0,wrready=0;
++wire [31:0] ia,wa,ba,oa;wire ir,wr,br,ov,busy,done;wire signed [7:0] od;
++reg iv=0,wv=0,bv=0;reg signed [7:0] id=0,wd=2;reg signed [31:0] bd=1;
++integer outputs=0,ireqs=0,wreqs=0,breqs=0;
++conv2d_memory_top dut(.clk(clk),.rst(rst),.start(start),.in_h(16'd1),.in_w(16'd2),.in_c(16'd1),.out_c(16'd1),
++.k_h(8'd1),.k_w(8'd1),.stride_h(8'd1),.stride_w(8'd1),.pad_h(8'd0),.pad_w(8'd0),
++.input_base(32'd100),.weight_base(32'd200),.bias_base(32'd300),.output_base(32'd400),
++.rd_input_addr(ia),.rd_input_req(ir),.rd_input_data(id),.rd_input_valid(iv),
++.rd_weight_addr(wa),.rd_weight_req(wr),.rd_weight_data(wd),.rd_weight_valid(wv),
++.rd_bias_addr(ba),.rd_bias_req(br),.rd_bias_data(bd),.rd_bias_valid(bv),
++.wr_output_addr(oa),.wr_output_data(od),.wr_output_valid(ov),.wr_output_ready(wrready),
++.relu_en(1'b0),.qmul(32'sd1),.qshift(6'd0),.zero_point(8'sd0),.busy(busy),.done(done));
++always #5 clk=~clk;
++always @(posedge clk)begin
++ iv<=ir;wv<=wr;bv<=br;
++ if(ir)begin id<=ia==100?3:6;ireqs=ireqs+1;end
++ if(wr)wreqs=wreqs+1;
++ if(br)breqs=breqs+1;
++ if(ov&&wrready)begin
++  if(oa!==(400+outputs)||$signed(od)!==(7+outputs*6))begin $display("FAIL memory Conv out=%0d addr=%0d data=%0d",outputs,oa,od);$finish;end
++  outputs=outputs+1;
++ end
++end
++initial begin
++ #12;rst=0;@(negedge clk);start=1;@(negedge clk);start=0;
++ wait(ov);repeat(30)begin @(negedge clk);if(!ov||oa!==400||od!==7||done)begin $display("FAIL output changed under stall");$finish;end end
++ wrready=1;wait(done);#1;
++ if(outputs!=2||ireqs!=2||wreqs!=2||breqs!=2)begin $display("FAIL memory counts out=%0d req=%0d/%0d/%0d",outputs,ireqs,wreqs,breqs);$finish;end
++ $display("PASS Conv memory first sample and output stall");$finish;
++end
++initial begin #10000;$display("FAIL Conv memory timeout");$finish;end
++endmodule
+--- 20round/verification/extra/tb_conv_memory_stall_c2.v
++++ deep/verification/extra/tb_conv_memory_stall_c2.v
+@@ -0,0 +1,34 @@
++`timescale 1ns/1ps
++module tb_conv_memory_stall_c2;
++reg clk=0,rst=1,start=0,wrready=0;
++wire [31:0] ia,wa,ba,oa;wire ir,wr,br,ov,busy,done;wire signed [7:0] od;
++reg iv=0,wv=0,bv=0;reg signed [7:0] id=0,wd=2;reg signed [31:0] bd=1;
++integer outputs=0,ireqs=0,wreqs=0,breqs=0;
++conv2d_memory_top dut(.clk(clk),.rst(rst),.start(start),.in_h(16'd1),.in_w(16'd2),.in_c(16'd2),.out_c(16'd1),
++.k_h(8'd1),.k_w(8'd1),.stride_h(8'd1),.stride_w(8'd1),.pad_h(8'd0),.pad_w(8'd0),
++.input_base(32'd100),.weight_base(32'd200),.bias_base(32'd300),.output_base(32'd400),
++.rd_input_addr(ia),.rd_input_req(ir),.rd_input_data(id),.rd_input_valid(iv),
++.rd_weight_addr(wa),.rd_weight_req(wr),.rd_weight_data(wd),.rd_weight_valid(wv),
++.rd_bias_addr(ba),.rd_bias_req(br),.rd_bias_data(bd),.rd_bias_valid(bv),
++.wr_output_addr(oa),.wr_output_data(od),.wr_output_valid(ov),.wr_output_ready(wrready),
++.relu_en(1'b0),.qmul(32'sd1),.qshift(6'd0),.zero_point(8'sd0),.busy(busy),.done(done));
++always #5 clk=~clk;
++always @(posedge clk)begin
++ iv<=ir;wv<=wr;bv<=br;
++ if(ir)begin id<=(ia-100+1)*3;ireqs=ireqs+1;end
++ if(wr)wreqs=wreqs+1;
++ if(br)breqs=breqs+1;
++ if(ov&&wrready)begin
++  if(oa!==(400+outputs)||$signed(od)!==(19+outputs*24))begin $display("FAIL memory Conv out=%0d addr=%0d data=%0d",outputs,oa,od);$finish;end
++  outputs=outputs+1;
++ end
++end
++initial begin
++ #12;rst=0;@(negedge clk);start=1;@(negedge clk);start=0;
++ wait(ov);repeat(30)begin @(negedge clk);if(!ov||oa!==400||od!==19||done)begin $display("FAIL output changed under stall");$finish;end end
++ wrready=1;wait(done);#1;
++ if(outputs!=2||ireqs!=4||wreqs!=4||breqs!=2)begin $display("FAIL memory counts out=%0d req=%0d/%0d/%0d",outputs,ireqs,wreqs,breqs);$finish;end
++ $display("PASS Conv memory C2 multi-sample and output stall");$finish;
++end
++initial begin #10000;$display("FAIL Conv memory timeout");$finish;end
++endmodule

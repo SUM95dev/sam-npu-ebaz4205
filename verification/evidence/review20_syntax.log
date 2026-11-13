@@ -1,0 +1,11 @@
+PASS shell scripts/build_ebaz4205_final.sh
+PASS shell scripts/fetch_ebaz4205_board_support.sh
+PASS shell scripts/install_ebaz4205_board_support_vivado.sh
+PASS shell scripts/summarize_ebaz_reports.sh
+PASS shell scripts/validate_release.sh
+PASS Tcl structural completeness scripts/build_bitstream_if_bd_ready.tcl
+PASS Tcl structural completeness scripts/build_ebaz4205_system.tcl
+PASS Tcl structural completeness scripts/create_ebaz4205_full_bd.tcl
+PASS Tcl structural completeness scripts/create_vivado_project.tcl
+PASS Tcl structural completeness scripts/create_zynq_dma_bd.tcl
+PASS Tcl structural completeness scripts/run_vivado_verification.tcl

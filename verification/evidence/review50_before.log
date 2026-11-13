@@ -1,0 +1,273 @@
+test_01_opcode_negative (__main__.Checks.test_01_opcode_negative) ... FAIL
+test_02_opcode_overflow (__main__.Checks.test_02_opcode_overflow) ... FAIL
+test_03_M_negative (__main__.Checks.test_03_M_negative) ... FAIL
+test_04_N_overflow (__main__.Checks.test_04_N_overflow) ... FAIL
+test_05_K_overflow (__main__.Checks.test_05_K_overflow) ... FAIL
+test_06_out_bytes_negative (__main__.Checks.test_06_out_bytes_negative) ... FAIL
+test_07_id_negative (__main__.Checks.test_07_id_negative) ... FAIL
+test_08_id_overflow (__main__.Checks.test_08_id_overflow) ... FAIL
+test_09_flags_fractional (__main__.Checks.test_09_flags_fractional) ... ERROR
+test_10_shift_fractional (__main__.Checks.test_10_shift_fractional) ... ok
+test_11_multiplier_fractional (__main__.Checks.test_11_multiplier_fractional) ... ok
+test_12_zero_point_fractional (__main__.Checks.test_12_zero_point_fractional) ... ok
+test_13_bad_magic (__main__.Checks.test_13_bad_magic) ... ok
+test_14_bad_id (__main__.Checks.test_14_bad_id) ... ok
+test_15_server_error (__main__.Checks.test_15_server_error) ... ok
+test_16_oversize_body (__main__.Checks.test_16_oversize_body) ... ok
+test_17_header_truncated (__main__.Checks.test_17_header_truncated) ... ok
+test_18_body_truncated (__main__.Checks.test_18_body_truncated) ... ok
+test_19_timeout_setup_closes_socket (__main__.Checks.test_19_timeout_setup_closes_socket) ... FAIL
+test_20_reconnect_after_bad_reply (__main__.Checks.test_20_reconnect_after_bad_reply) ... ok
+test_21_request_id_wrap (__main__.Checks.test_21_request_id_wrap) ... ok
+test_22_fragmented_body (__main__.Checks.test_22_fragmented_body) ... ok
+test_23_wrapper_validates_before_connect (__main__.Checks.test_23_wrapper_validates_before_connect) ... FAIL
+test_24_wire_signed_extremes (__main__.Checks.test_24_wire_signed_extremes) ... ok
+test_25_snpu_bad_magic (__main__.Checks.test_25_snpu_bad_magic) ... ok
+test_26_snpu_version (__main__.Checks.test_26_snpu_version) ... ok
+test_27_snpu_empty_layers (__main__.Checks.test_27_snpu_empty_layers) ... ok
+test_28_snpu_unknown_op (__main__.Checks.test_28_snpu_unknown_op) ... ok
+test_29_snpu_truncated_header (__main__.Checks.test_29_snpu_truncated_header) ... ok
+test_30_snpu_M_zero (__main__.Checks.test_30_snpu_M_zero) ... ok
+test_31_snpu_N_zero (__main__.Checks.test_31_snpu_N_zero) ... ok
+test_32_snpu_K_zero (__main__.Checks.test_32_snpu_K_zero) ... ok
+test_33_snpu_weight_count (__main__.Checks.test_33_snpu_weight_count) ... ok
+test_34_snpu_bias_count (__main__.Checks.test_34_snpu_bias_count) ... ok
+test_35_snpu_conv_H_zero (__main__.Checks.test_35_snpu_conv_H_zero) ... ok
+test_36_snpu_conv_W_zero (__main__.Checks.test_36_snpu_conv_W_zero) ... ok
+test_37_snpu_conv_C_zero (__main__.Checks.test_37_snpu_conv_C_zero) ... ok
+test_38_snpu_conv_O_zero (__main__.Checks.test_38_snpu_conv_O_zero) ... ok
+test_39_snpu_conv_stride_zero (__main__.Checks.test_39_snpu_conv_stride_zero) ... ok
+test_40_snpu_conv_kernel_too_large (__main__.Checks.test_40_snpu_conv_kernel_too_large) ... ok
+test_41_packer_ragged_A (__main__.Checks.test_41_packer_ragged_A) ... ok
+test_42_packer_ragged_B (__main__.Checks.test_42_packer_ragged_B) ... ok
+test_43_packer_empty_matrix (__main__.Checks.test_43_packer_empty_matrix) ... ok
+test_44_packer_i8_overflow (__main__.Checks.test_44_packer_i8_overflow) ... ok
+test_45_packer_i8_underflow (__main__.Checks.test_45_packer_i8_underflow) ... ok
+test_46_packer_bias_overflow (__main__.Checks.test_46_packer_bias_overflow) ... ok
+test_47_packer_bias_count (__main__.Checks.test_47_packer_bias_count) ... ok
+test_48_packer_conv_group_mismatch (__main__.Checks.test_48_packer_conv_group_mismatch) ... ok
+test_49_server_SIGTERM_idle_accept (__main__.Checks.test_49_server_SIGTERM_idle_accept) ... FAIL SIGTERM left accept blocked
+ERROR
+test_50_server_SIGTERM_partial_request (__main__.Checks.test_50_server_SIGTERM_partial_request) ... FAIL SIGTERM left recv_all blocked
+ERROR
+
+======================================================================
+ERROR: test_09_flags_fractional (__main__.Checks.test_09_flags_fractional)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 68, in test
+    def test(self,kw=kw):self.reject_header(kw)
+                         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 36, in reject_header
+    with self.assertRaises((ValueError,TypeError,struct.error,OverflowError)):s.request(**kw)
+                                                                              ^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_DEEP_REVIEW/sw/host/npu_net_client.py", line 113, in request
+    raise RuntimeError(f"unexpected reply size {n}, expected {expected}")
+RuntimeError: unexpected reply size 4, expected 0
+
+======================================================================
+ERROR: test_49_server_SIGTERM_idle_accept (__main__.Checks.test_49_server_SIGTERM_idle_accept)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 64, in test_49_server_SIGTERM_idle_accept
+    def test_49_server_SIGTERM_idle_accept(self):subprocess.run([self.shutdown,'0'],check=True,timeout=3)
+                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/tmp/tmpw_flq4yd/test', '0']' returned non-zero exit status 1.
+
+======================================================================
+ERROR: test_50_server_SIGTERM_partial_request (__main__.Checks.test_50_server_SIGTERM_partial_request)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 65, in test_50_server_SIGTERM_partial_request
+    def test_50_server_SIGTERM_partial_request(self):subprocess.run([self.shutdown,'1'],check=True,timeout=3)
+                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/tmp/tmpw_flq4yd/test', '1']' returned non-zero exit status 1.
+
+======================================================================
+FAIL: test_01_opcode_negative (__main__.Checks.test_01_opcode_negative)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 68, in test
+    def test(self,kw=kw):self.reject_header(kw)
+                         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 37, in reject_header
+    self.assertEqual(calls,[], 'invalid local header opened a network session')
+AssertionError: Lists differ: [1] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+1
+
+- [1]
+?  -
+
++ [] : invalid local header opened a network session
+
+======================================================================
+FAIL: test_02_opcode_overflow (__main__.Checks.test_02_opcode_overflow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 68, in test
+    def test(self,kw=kw):self.reject_header(kw)
+                         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 37, in reject_header
+    self.assertEqual(calls,[], 'invalid local header opened a network session')
+AssertionError: Lists differ: [1] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+1
+
+- [1]
+?  -
+
++ [] : invalid local header opened a network session
+
+======================================================================
+FAIL: test_03_M_negative (__main__.Checks.test_03_M_negative)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 68, in test
+    def test(self,kw=kw):self.reject_header(kw)
+                         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 37, in reject_header
+    self.assertEqual(calls,[], 'invalid local header opened a network session')
+AssertionError: Lists differ: [1] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+1
+
+- [1]
+?  -
+
++ [] : invalid local header opened a network session
+
+======================================================================
+FAIL: test_04_N_overflow (__main__.Checks.test_04_N_overflow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 68, in test
+    def test(self,kw=kw):self.reject_header(kw)
+                         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 37, in reject_header
+    self.assertEqual(calls,[], 'invalid local header opened a network session')
+AssertionError: Lists differ: [1] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+1
+
+- [1]
+?  -
+
++ [] : invalid local header opened a network session
+
+======================================================================
+FAIL: test_05_K_overflow (__main__.Checks.test_05_K_overflow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 68, in test
+    def test(self,kw=kw):self.reject_header(kw)
+                         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 37, in reject_header
+    self.assertEqual(calls,[], 'invalid local header opened a network session')
+AssertionError: Lists differ: [1] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+1
+
+- [1]
+?  -
+
++ [] : invalid local header opened a network session
+
+======================================================================
+FAIL: test_06_out_bytes_negative (__main__.Checks.test_06_out_bytes_negative)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 68, in test
+    def test(self,kw=kw):self.reject_header(kw)
+                         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 37, in reject_header
+    self.assertEqual(calls,[], 'invalid local header opened a network session')
+AssertionError: Lists differ: [1] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+1
+
+- [1]
+?  -
+
++ [] : invalid local header opened a network session
+
+======================================================================
+FAIL: test_07_id_negative (__main__.Checks.test_07_id_negative)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 68, in test
+    def test(self,kw=kw):self.reject_header(kw)
+                         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 37, in reject_header
+    self.assertEqual(calls,[], 'invalid local header opened a network session')
+AssertionError: Lists differ: [1] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+1
+
+- [1]
+?  -
+
++ [] : invalid local header opened a network session
+
+======================================================================
+FAIL: test_08_id_overflow (__main__.Checks.test_08_id_overflow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 68, in test
+    def test(self,kw=kw):self.reject_header(kw)
+                         ^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 37, in reject_header
+    self.assertEqual(calls,[], 'invalid local header opened a network session')
+AssertionError: Lists differ: [1] != []
+
+First list contains 1 additional elements.
+First extra element 0:
+1
+
+- [1]
+?  -
+
++ [] : invalid local header opened a network session
+
+======================================================================
+FAIL: test_19_timeout_setup_closes_socket (__main__.Checks.test_19_timeout_setup_closes_socket)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 42, in test_19_timeout_setup_closes_socket
+    self.assertTrue(sock.closed);self.assertIsNone(s.sock)
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_23_wrapper_validates_before_connect (__main__.Checks.test_23_wrapper_validates_before_connect)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_REVIEW50/verification/review50/run_50_checks.py", line 56, in test_23_wrapper_validates_before_connect
+    connect.assert_not_called()
+  File "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py", line 910, in assert_not_called
+    raise AssertionError(msg)
+AssertionError: Expected 'create_connection' to not have been called. Called 1 times.
+Calls: [call(('unused', 9505), timeout=10)].
+
+----------------------------------------------------------------------
+Ran 50 tests in 2.210s
+
+FAILED (failures=10, errors=3)

@@ -1,0 +1,11 @@
+make: Entering directory '/tmp/snpu_deep_tools/headers/usr/src/linux-headers-6.8.0-31-generic'
+warning: the compiler differs from the one used to build the kernel
+  The kernel was built by: x86_64-linux-gnu-gcc-13 (Ubuntu 13.2.0-23ubuntu4) 13.2.0
+  You are using:           gcc (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0
+  CC [M]  /workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_DEEP_REVIEW/sw/linux/npu_dma_proxy.o
+  MODPOST /workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_DEEP_REVIEW/sw/linux/Module.symvers
+  CC [M]  /workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_DEEP_REVIEW/sw/linux/npu_dma_proxy.mod.o
+  LD [M]  /workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_DEEP_REVIEW/sw/linux/npu_dma_proxy.ko
+  BTF [M] /workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_DEEP_REVIEW/sw/linux/npu_dma_proxy.ko
+Skipping BTF generation for /workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_DEEP_REVIEW/sw/linux/npu_dma_proxy.ko due to unavailability of vmlinux
+make: Leaving directory '/tmp/snpu_deep_tools/headers/usr/src/linux-headers-6.8.0-31-generic'

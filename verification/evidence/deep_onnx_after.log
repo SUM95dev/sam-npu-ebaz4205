@@ -1,0 +1,13 @@
+test_conv_dynamic_bias_rejected (__main__.Tests.test_conv_dynamic_bias_rejected) ... ok
+test_conv_weight_order (__main__.Tests.test_conv_weight_order) ... ok
+test_float_weights_rejected (__main__.Tests.test_float_weights_rejected) ... ok
+test_matmul_roundtrip (__main__.Tests.test_matmul_roundtrip) ... ok
+test_pool_autopad_rejected (__main__.Tests.test_pool_autopad_rejected) ... ok
+test_pool_ceil_rejected (__main__.Tests.test_pool_ceil_rejected) ... ok
+test_pool_default_stride_rejected (__main__.Tests.test_pool_default_stride_rejected) ... ok
+test_pool_explicit_stride (__main__.Tests.test_pool_explicit_stride) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 1.447s
+
+OK

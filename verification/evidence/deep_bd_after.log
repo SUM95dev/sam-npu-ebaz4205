@@ -1,0 +1,17 @@
+INFO: project BOARD_PART=mock:ebaz4205:1.0
+INFO: PS7 board preset applied.
+INFO: EBAZ PHY reference clock output disabled (assumes onboard Y3/oscillator is present).
+============================================================
+Sam NPU EBAZ4205 block design created and validated structurally.
+Control: PS M_AXI_GP0 -> NPU + AXI DMA S_AXI_LITE
+Data: DDR/HP0 <-> AXI DMA <-> NPU AXI-Stream
+Clock: FCLK_CLK0 = 100 MHz
+Ethernet: PS GEM0/EMIO <-> IP101GA PHY (4-bit MII), TCP/IP handled by ARM/Linux
+PHY 25MHz from PL: 0
+NPU control: 0x43C00000 / 64K
+DMA control: 0x40400000 / 64K
+============================================================
+INFO: project BOARD_PART=mock:ebaz4205:1.0
+INFO: PS7 board preset applied.
+INFO: EBAZ PHY reference clock output disabled (assumes onboard Y3/oscillator is present).
+PASS BD explicit 23-bit DMA length, active-low reset and required IRQ fail-fast

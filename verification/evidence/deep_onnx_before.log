@@ -1,0 +1,25 @@
+test_conv_dynamic_bias_rejected (__main__.Tests.test_conv_dynamic_bias_rejected) ... ok
+test_conv_weight_order (__main__.Tests.test_conv_weight_order) ... ok
+test_float_weights_rejected (__main__.Tests.test_float_weights_rejected) ... ok
+test_matmul_roundtrip (__main__.Tests.test_matmul_roundtrip) ... ok
+test_pool_autopad_rejected (__main__.Tests.test_pool_autopad_rejected) ... ok
+test_pool_ceil_rejected (__main__.Tests.test_pool_ceil_rejected) ... ok
+test_pool_default_stride_rejected (__main__.Tests.test_pool_default_stride_rejected) ... FAIL
+test_pool_explicit_stride (__main__.Tests.test_pool_explicit_stride) ... ok
+
+======================================================================
+FAIL: test_pool_default_stride_rejected (__main__.Tests.test_pool_default_stride_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_DEEP_REVIEW/verification/deep/test_onnx_integration.py", line 26, in test_pool_default_stride_rejected
+    def test_pool_default_stride_rejected(self):self.convert(*self.pool(),ok=False,reason='Only MaxPool 2x2 stride2')
+                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/scratch/867bacf57572/Sam_NPU_EBAZ4205_DEEP_REVIEW/verification/deep/test_onnx_integration.py", line 15, in convert
+    if not ok:self.assertNotEqual(r.returncode,0);self.assertIn(reason,r.stderr);return
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 0 == 0
+
+----------------------------------------------------------------------
+Ran 8 tests in 1.611s
+
+FAILED (failures=1)
